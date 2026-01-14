@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logistics Command v40.0</title>
+    <title>Logistics Command v42.0</title>
     
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://alcdn.msauth.net/browser/2.14.2/js/msal-browser.min.js"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
@@ -13,30 +13,18 @@
 
     <style>
         :root {
-            --bg-body: #f8fafc;
-            --bg-side: #ffffff;
-            --bg-card: #ffffff;
-            --text-main: #1e293b;
-            --text-muted: #64748b;
-            --border: #e2e8f0;
-            --brand: #2563eb;
-            --accent: #eff6ff;
+            --bg-body: #f8fafc; --bg-side: #ffffff; --bg-card: #ffffff;
+            --text-main: #1e293b; --text-muted: #64748b; --border: #e2e8f0;
+            --brand: #2563eb; --accent: #eff6ff;
         }
 
         .theme-dark {
-            --bg-body: #0f172a;
-            --bg-side: #1e293b;
-            --bg-card: #1e293b;
-            --text-main: #f1f5f9;
-            --text-muted: #94a3b8;
-            --border: #334155;
-            --brand: #38bdf8;
-            --accent: #0f172a;
+            --bg-body: #0f172a; --bg-side: #1e293b; --bg-card: #1e293b;
+            --text-main: #f1f5f9; --text-muted: #94a3b8; --border: #334155;
+            --brand: #38bdf8; --accent: #0f172a;
         }
 
         body { background-color: var(--bg-body); color: var(--text-main); font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; transition: all 0.2s ease; }
-        
-        /* Responsive Grid */
         .app-grid { display: grid; grid-template-columns: 240px 1fr 0px; height: calc(100vh - 64px); transition: grid-template-columns 0.3s ease; }
         .app-grid.show-detail { grid-template-columns: 240px 1fr 450px; }
 
@@ -48,11 +36,11 @@
         tr.active-row { background-color: var(--accent) !important; border-left: 4px solid var(--brand); }
         
         input, select, textarea { background-color: var(--bg-card) !important; color: var(--text-main) !important; border: 1px solid var(--border) !important; outline: none; }
-        
         .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
-        #detail-panel { overflow-x: hidden; border-l: 1px solid var(--border); background: var(--bg-side); }
+        #theme-dropdown { display: none; position: absolute; right: 0; top: 100%; mt: 0.5rem; width: 10rem; background: var(--bg-side); border: 1px solid var(--border); border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 50; }
+        #theme-dropdown.show { display: block; }
     </style>
 </head>
 <body class="theme-default" id="app-body">
@@ -69,23 +57,36 @@
 
     <header class="h-16 border-b flex items-center justify-between px-6 z-10">
         <div class="flex items-center gap-6">
-            <div class="text-xl font-black tracking-tighter italic" style="color: var(--brand)">LOGICOMMAND <span class="text-[10px] opacity-50 not-italic ml-1">v40.0</span></div>
-            <input type="text" id="global-search" oninput="render()" placeholder="Search drivers, orders, or reps..." class="rounded-lg px-4 py-2 text-xs w-64">
+            <div class="text-xl font-black tracking-tighter italic" style="color: var(--brand)">LOGICOMMAND <span class="text-[10px] opacity-50 not-italic ml-1">v42.0</span></div>
+            <input type="text" id="global-search" oninput="render()" placeholder="Search..." class="rounded-lg px-4 py-2 text-xs w-64">
         </div>
         
-        <div class="flex items-center gap-3">
-            <select id="filter-rep" onchange="render()" class="rounded-lg px-3 py-1.5 text-[10px] font-bold"></select>
-            <select id="filter-status" onchange="render()" class="rounded-lg px-3 py-1.5 text-[10px] font-bold">
-                <option value="ALL">ALL DISPOSITIONS</option>
-                <option value="Pending">PENDING</option>
-                <option value="Completed">COMPLETED</option>
-                <option value="Escalated">ESCALATED</option>
-            </select>
-        </div>
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2">
+                <select id="filter-rep" onchange="render()" class="rounded-lg px-3 py-1.5 text-[10px] font-bold"></select>
+                <select id="filter-status" onchange="render()" class="rounded-lg px-3 py-1.5 text-[10px] font-bold">
+                    <option value="ALL">ALL STATUS</option>
+                    <option value="Pending">PENDING</option>
+                    <option value="Completed">COMPLETED</option>
+                </select>
+            </div>
 
-        <div class="text-right">
-            <p id="user-display-name" class="text-xs font-bold leading-none">Guest User</p>
-            <p id="sync-clock" class="text-[9px] font-bold uppercase mt-1" style="color: var(--text-muted)">Waiting for Sync...</p>
+            <div class="h-8 w-px bg-gray-200 mx-2"></div>
+
+            <div class="text-right mr-2">
+                <p id="user-display-name" class="text-xs font-bold leading-none">Guest User</p>
+                <p id="sync-clock" class="text-[9px] font-bold uppercase mt-1" style="color: var(--text-muted)">Syncing...</p>
+            </div>
+
+            <div class="relative">
+                <button onclick="toggleThemeMenu()" class="text-[10px] font-black uppercase tracking-widest flex items-center gap-2 px-3 py-2 border rounded-lg hover:bg-gray-50">
+                    Themes <i class="fa fa-chevron-down text-[8px]"></i>
+                </button>
+                <div id="theme-dropdown" class="p-2">
+                    <button onclick="setTheme('default')" class="w-full text-left px-4 py-2 text-[10px] font-bold hover:bg-blue-50 rounded-lg">☀️ Light Mode</button>
+                    <button onclick="setTheme('dark')" class="w-full text-left px-4 py-2 text-[10px] font-bold hover:bg-blue-50 rounded-lg">🌙 Dark Mode</button>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -93,28 +94,15 @@
         <aside class="border-r flex flex-col p-4 space-y-6">
             <nav class="space-y-1">
                 <button onclick="setMode('today')" id="btn-today" class="nav-btn active w-full flex items-center gap-3 p-3 rounded-xl font-bold text-xs">
-                    <i class="fa fa-calendar-day"></i> Today's Live Active
+                    <i class="fa fa-calendar-day"></i> Today
                 </button>
                 <button onclick="setMode('all')" id="btn-all" class="nav-btn w-full flex items-center gap-3 p-3 rounded-xl font-bold text-xs opacity-60">
-                    <i class="fa fa-database"></i> Full Archive
+                    <i class="fa fa-database"></i> Archive (14D)
                 </button>
             </nav>
-
-            <div class="space-y-2">
-                <p class="text-[9px] font-black opacity-50 uppercase tracking-widest px-2">Theme</p>
-                <div class="flex gap-2 px-2">
-                    <button onclick="setTheme('default')" class="w-6 h-6 rounded-full bg-blue-600 border-2 border-white"></button>
-                    <button onclick="setTheme('dark')" class="w-6 h-6 rounded-full bg-slate-900 border-2 border-white"></button>
-                </div>
-            </div>
-            
-            <div class="mt-auto space-y-4">
-                <div class="p-4 rounded-2xl bg-slate-900 text-white shadow-lg">
-                    <p id="stat-pending" class="text-2xl font-black">0</p>
-                    <p class="text-[9px] font-bold opacity-50 uppercase">Today's Pending</p>
-                </div>
-                <button onclick="fetchLiveData()" id="refresh-btn" class="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-2">
-                    <i class="fas fa-sync-alt" id="refresh-icon"></i> <span id="refresh-text">Refresh Now</span>
+            <div class="mt-auto">
+                <button onclick="fetchLiveData()" id="refresh-btn" class="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 flex items-center justify-center gap-2">
+                    <i class="fas fa-sync-alt" id="refresh-icon"></i> <span>Refresh</span>
                 </button>
             </div>
         </aside>
@@ -124,11 +112,7 @@
                 <table class="w-full text-left border-collapse">
                     <thead class="sticky top-0 bg-inherit border-b z-10">
                         <tr class="text-[9px] uppercase opacity-60 font-black">
-                            <th class="p-4">Customer / Order</th>
-                            <th class="p-4">WHSE / Route</th>
-                            <th class="p-4">Driver & Phone</th>
-                            <th class="p-4">Rep</th>
-                            <th class="p-4">Status</th>
+                            <th class="p-4">Customer</th><th class="p-4">WHSE</th><th class="p-4">Phone</th><th class="p-4">Rep</th><th class="p-4">Status</th>
                         </tr>
                     </thead>
                     <tbody id="ticket-list"></tbody>
@@ -136,40 +120,19 @@
             </div>
         </main>
 
-        <aside id="detail-panel" class="hidden h-full overflow-y-auto custom-scroll">
+        <aside id="detail-panel" class="hidden h-full overflow-y-auto custom-scroll border-l">
             <div class="p-6 space-y-6">
                 <div class="flex justify-between items-center">
                     <span id="d-id-badge" class="text-[10px] font-mono opacity-50"></span>
                     <button onclick="closeDetail()" class="text-lg opacity-50 hover:opacity-100"><i class="fa fa-times"></i></button>
                 </div>
-                
-                <h2 id="d-company" class="text-xl font-black leading-tight"></h2>
-                <div class="grid grid-cols-3 gap-2">
-                    <a id="btn-call" href="#" class="flex flex-col items-center p-3 bg-slate-50 dark:bg-slate-800 border rounded-xl hover:bg-blue-600 hover:text-white transition">
-                        <i class="fa fa-phone mb-1"></i><span class="text-[9px] font-black uppercase">Call</span>
-                    </a>
-                    <a id="btn-text" href="#" class="flex flex-col items-center p-3 bg-slate-50 dark:bg-slate-800 border rounded-xl hover:bg-blue-600 hover:text-white transition">
-                        <i class="fa fa-comment-dots mb-1"></i><span class="text-[9px] font-black uppercase">Text</span>
-                    </a>
-                    <button onclick="setStatus('Completed')" class="flex flex-col items-center p-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition">
-                        <i class="fa fa-check mb-1"></i><span class="text-[9px] font-black uppercase">Done</span>
-                    </button>
-                </div>
-
+                <h2 id="d-company" class="text-xl font-black"></h2>
                 <div class="p-4 rounded-xl border bg-slate-50 dark:bg-slate-800/50">
-                    <p id="d-issue" class="text-[10px] font-black text-red-500 uppercase mb-1"></p>
-                    <div id="d-desc" class="text-sm opacity-80 leading-relaxed italic"></div>
+                    <p id="d-issue" class="text-[10px] font-black text-red-500 uppercase"></p>
+                    <div id="d-desc" class="text-sm opacity-80 italic mt-2"></div>
                 </div>
-
-                <div>
-                    <label class="text-[9px] font-black uppercase opacity-50 px-1">Internal Log Notes</label>
-                    <textarea id="d-notes" oninput="saveLocal()" class="w-full mt-2 p-4 rounded-xl h-32 text-xs" placeholder="Add updates..."></textarea>
-                </div>
-
-                <div class="pt-6 border-t">
-                    <p class="text-[10px] font-black opacity-50 uppercase mb-3">Recent Activity</p>
-                    <div id="d-audit" class="space-y-2"></div>
-                </div>
+                <textarea id="d-notes" oninput="saveLocal()" class="w-full p-4 rounded-xl h-32 text-xs" placeholder="Updates..."></textarea>
+                <button onclick="setStatus('Completed')" class="w-full py-3 bg-green-600 text-white rounded-xl font-black text-xs uppercase tracking-widest">Mark Completed</button>
             </div>
         </aside>
     </div>
@@ -182,7 +145,7 @@
             cache: { cacheLocation: "localStorage" }
         });
 
-        let db = JSON.parse(localStorage.getItem('logistics_db_v40')) || [];
+        let db = JSON.parse(localStorage.getItem('logistics_db_v42')) || [];
         let currentMode = 'today';
         let currentTicketId = null;
 
@@ -193,8 +156,7 @@
                 document.getElementById('user-display-name').innerText = accounts[0].name;
                 document.getElementById('auth-screen').classList.add('hidden');
                 document.getElementById('app-ui').classList.remove('hidden');
-                render(); 
-                fetchLiveData();
+                pruneData(); render(); fetchLiveData();
             }
         };
 
@@ -205,35 +167,20 @@
         }
 
         async function fetchLiveData() {
-            const icon = document.getElementById('refresh-icon');
-            const text = document.getElementById('refresh-text');
-            icon.classList.add('fa-spin');
-            text.innerText = "Refreshing...";
-            
+            const icon = document.getElementById('refresh-icon'); icon.classList.add('fa-spin');
             try {
-                // SCHEMA FIX: Sending as a proper JSON object to avoid TriggerInputSchemaMismatch
                 const response = await fetch(FLOW_URL, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: "Refresh" }) 
                 });
                 const data = await response.json();
-                if (response.ok) {
-                    let rows = data.schema?.data || (typeof data.body === 'string' ? JSON.parse(data.body).value : data.value);
-                    if (rows) ingest(rows);
-                }
-            } catch (e) { 
-                console.error(e);
-                Toastify({ text: "Flow Sync Failed", style: { background: "#ef4444" } }).showToast();
-            }
+                if (response.ok) ingest(data.value || []);
+            } catch (e) { console.error(e); }
             icon.classList.remove('fa-spin');
-            text.innerText = "Refresh Now";
         }
 
         function ingest(data) {
             data.forEach(r => {
-                const driverRaw = val(r, ['drivername', 'driver']);
-                const phoneMatch = driverRaw.match(/\d{3}[-\s]?\d{3}[-\s]?\d{4}/);
                 const item = {
                     id: val(r, ['id', 'iteminternalid']),
                     company: val(r, ['company', 'deliverylocation']),
@@ -241,8 +188,7 @@
                     whse: val(r, ['warehouse']),
                     route: val(r, ['route']),
                     rep: val(r, ['name', 'submittedby', 'rep']),
-                    driverName: driverRaw.split(/[0-9]/)[0].trim(),
-                    driverPhone: phoneMatch ? phoneMatch[0] : '---',
+                    driverPhone: (val(r, ['drivername']).match(/\d{3}[-\s]?\d{3}[-\s]?\d{4}/) || ['---'])[0],
                     issue: val(r, ['issue']),
                     desc: val(r, ['description']),
                     date: (val(r, ['starttime']) || "").split('T')[0],
@@ -252,12 +198,47 @@
                 if(item.id) {
                     const idx = db.findIndex(x => x.id === item.id);
                     if(idx > -1) db[idx] = {...db[idx], ...item};
-                    else db.push({...item, notes: "", audit: []});
+                    else db.push({...item, notes: ""});
                 }
             });
-            document.getElementById('sync-clock').innerText = `Last Sync: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-            updateRepList();
-            saveLocal(true);
+            pruneData(); updateRepList(); saveLocal(true);
+        }
+
+        function pruneData() {
+            const twoWeeksAgo = Date.now() - (14 * 24 * 60 * 60 * 1000);
+            db = db.filter(t => t.status !== 'Completed' || t.timestamp > twoWeeksAgo);
+        }
+
+        function saveLocal(reRender = false) {
+            const t = db.find(x => x.id === currentTicketId);
+            if(t) t.notes = document.getElementById('d-notes').value;
+            try {
+                localStorage.setItem('logistics_db_v42', JSON.stringify(db));
+            } catch (e) {
+                db = db.filter(x => x.status !== 'Completed'); // Emergency purge: only keep uncompleted
+                localStorage.setItem('logistics_db_v42', JSON.stringify(db));
+            }
+            if (reRender) render();
+        }
+
+        function toggleThemeMenu() { document.getElementById('theme-dropdown').classList.toggle('show'); }
+        function setTheme(t) { 
+            document.getElementById('app-body').className = t === 'dark' ? 'theme-dark' : 'theme-default';
+            toggleThemeMenu();
+        }
+
+        function val(row, terms) {
+            for (let t of terms) {
+                for (let k in row) { if (k.toLowerCase().includes(t.toLowerCase())) return String(row[k] || '').trim(); }
+            }
+            return '';
+        }
+
+        function setMode(m) {
+            currentMode = m;
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-' + m).classList.add('active');
+            render();
         }
 
         function updateRepList() {
@@ -274,103 +255,32 @@
             const today = new Date().toISOString().split('T')[0];
             
             list.innerHTML = '';
-            const filtered = db.filter(t => (currentMode === 'all' || t.date === today))
-                               .filter(t => repF === 'ALL' || t.rep === repF)
-                               .filter(t => statF === 'ALL' || t.status === statF)
-                               .filter(t => JSON.stringify(t).toLowerCase().includes(search))
-                               .sort((a,b) => b.timestamp - a.timestamp);
-
-            document.getElementById('stat-pending').innerText = db.filter(x => x.status !== 'Completed' && x.date === today).length;
-
-            filtered.forEach(t => {
+            db.filter(t => (currentMode === 'all' || t.date === today))
+              .filter(t => repF === 'ALL' || t.rep === repF)
+              .filter(t => statF === 'ALL' || t.status === statF)
+              .filter(t => JSON.stringify(t).toLowerCase().includes(search))
+              .sort((a,b) => b.timestamp - a.timestamp)
+              .forEach(t => {
                 const tr = document.createElement('tr');
-                tr.className = currentTicketId === t.id ? 'active-row' : '';
                 tr.onclick = () => loadTicket(t.id);
-                tr.innerHTML = `
-                    <td class="p-4"><div class="font-bold text-xs">${t.company}</div><div class="text-[9px] opacity-50">SO# ${t.order}</div></td>
-                    <td class="p-4"><div class="font-bold text-xs">${t.whse}</div><div class="text-[9px] opacity-50">Route ${t.route}</div></td>
-                    <td class="p-4"><div class="font-bold text-xs">${t.driverName}</div><div class="text-[9px] text-blue-500 font-mono">${t.driverPhone}</div></td>
-                    <td class="p-4 text-[10px] font-bold uppercase">${t.rep}</td>
-                    <td class="p-4"><span class="px-2 py-1 rounded text-[9px] font-black uppercase ${t.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${t.status}</span></td>
-                `;
+                tr.innerHTML = `<td class="p-4 text-xs font-bold">${t.company}</td><td class="p-4 text-[10px]">${t.whse}</td><td class="p-4 text-[10px] font-mono">${t.driverPhone}</td><td class="p-4 text-[10px] uppercase">${t.rep}</td><td class="p-4 text-[9px] uppercase">${t.status}</td>`;
                 list.appendChild(tr);
             });
         }
 
         function loadTicket(id) {
-            currentTicketId = id;
-            const t = db.find(x => x.id === id);
-            const panel = document.getElementById('detail-panel');
-            const grid = document.querySelector('.app-grid');
-            
-            panel.classList.remove('hidden');
-            grid.classList.add('show-detail');
-            
+            currentTicketId = id; const t = db.find(x => x.id === id);
+            document.getElementById('detail-panel').classList.remove('hidden');
+            document.querySelector('.app-grid').classList.add('show-detail');
             document.getElementById('d-id-badge').innerText = `#${t.id}`;
             document.getElementById('d-company').innerText = t.company;
             document.getElementById('d-issue').innerText = t.issue;
             document.getElementById('d-desc').innerText = t.desc;
             document.getElementById('d-notes').value = t.notes || '';
-            
-            if(t.driverPhone !== '---') {
-                document.getElementById('btn-call').href = `tel:${t.driverPhone}`;
-                document.getElementById('btn-text').href = `sms:${t.driverPhone}&body=WB Logistics regarding delivery to ${t.company}: `;
-            }
-            
-            document.getElementById('d-audit').innerHTML = (t.audit || []).slice(-5).reverse().map(a => `
-                <div class="text-[10px] p-2 rounded border border-slate-100 opacity-60">
-                    <span class="font-bold">${a.time}</span>: ${a.msg}
-                </div>
-            `).join('');
-            render();
         }
 
-        function closeDetail() {
-            currentTicketId = null;
-            document.getElementById('detail-panel').classList.add('hidden');
-            document.querySelector('.app-grid').classList.remove('show-detail');
-            render();
-        }
-
-        function setTheme(t) {
-            document.getElementById('app-body').className = t === 'dark' ? 'theme-dark' : 'theme-default';
-        }
-
-        function setStatus(s) {
-            const t = db.find(x => x.id === currentTicketId);
-            if(t) { 
-                t.status = s; 
-                if(!t.audit) t.audit = [];
-                t.audit.push({ time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), msg: `Set to ${s}` });
-                saveLocal(true); 
-            }
-        }
-
-        function saveLocal(reRender = false) {
-            const t = db.find(x => x.id === currentTicketId);
-            if(t) t.notes = document.getElementById('d-notes').value;
-            localStorage.setItem('logistics_db_v40', JSON.stringify(db));
-            if (reRender) render();
-        }
-
-        function val(row, terms) {
-            const keys = Object.keys(row);
-            for (let t of terms) {
-                const nt = t.toLowerCase().replace(/[^a-z0-9]/g, '');
-                for (let k of keys) {
-                    const ck = k.toLowerCase().replace(/_x[0-9a-f]{4}_/g, '').replace(/[^a-z0-9]/g, '');
-                    if (ck.includes(nt)) return String(row[k] || '').trim();
-                }
-            }
-            return '';
-        }
-
-        function setMode(m) {
-            currentMode = m;
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById('btn-' + m).classList.add('active');
-            render();
-        }
+        function closeDetail() { document.getElementById('detail-panel').classList.add('hidden'); document.querySelector('.app-grid').classList.remove('show-detail'); }
+        function setStatus(s) { const t = db.find(x => x.id === currentTicketId); if(t) { t.status = s; saveLocal(true); } }
     </script>
 </body>
 </html>
