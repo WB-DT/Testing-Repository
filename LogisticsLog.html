@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logistics Command v38.0</title>
+    <title>Logistics Command v38.1</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -13,7 +13,6 @@
 
     <style>
         body { font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        /* Expanded Grid for the larger table */
         .app-grid { display: grid; grid-template-columns: 240px 1fr 400px; height: 100%; }
         .nav-btn.active { background-color: #eff6ff; color: #2563eb; border-right: 4px solid #2563eb; }
         .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -36,7 +35,7 @@
 
     <header class="h-16 bg-white border-b flex items-center justify-between px-6 z-10">
         <div class="flex items-center gap-6">
-            <div class="text-xl font-black text-blue-600 tracking-tighter italic">LOGICOMMAND <span class="text-slate-400 text-[10px] font-normal not-italic ml-1">v38.0</span></div>
+            <div class="text-xl font-black text-blue-600 tracking-tighter italic">LOGICOMMAND <span class="text-slate-400 text-[10px] font-normal not-italic ml-1">v38.1</span></div>
             <div class="relative">
                 <i class="fa fa-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
                 <input type="text" id="global-search" oninput="render()" placeholder="Search by Driver, Company, Rep, or Order..." class="bg-slate-100 border-none rounded-lg pl-9 pr-4 py-2 text-xs w-80 focus:ring-2 ring-blue-500 transition outline-none">
@@ -47,7 +46,7 @@
                 <p id="user-display-name" class="text-xs font-bold leading-none">Guest User</p>
                 <p id="sync-clock" class="text-[9px] text-slate-400 font-bold uppercase mt-1">Waiting for Sync...</p>
             </div>
-            </div>
+        </div>
     </header>
 
     <div id="app-ui" class="app-grid hidden">
@@ -86,7 +85,7 @@
 
         <main class="bg-white overflow-hidden border-r">
             <div class="overflow-auto custom-scroll h-full">
-                <table class="w-full text-left border-collapse min-w-[900px]">
+                <table class="w-full text-left border-collapse min-w-[1100px]">
                     <thead class="sticky top-0 bg-slate-50 border-b z-10">
                         <tr class="text-[10px] uppercase text-slate-500 font-black">
                             <th class="p-4 bg-slate-50">Customer / Order #</th>
@@ -156,7 +155,7 @@
             cache: { cacheLocation: "localStorage" }
         });
 
-        let db = JSON.parse(localStorage.getItem('logistics_db_v38')) || [];
+        let db = JSON.parse(localStorage.getItem('logistics_db_v38_1')) || [];
         let currentMode = 'today';
         let currentTicketId = null;
 
@@ -182,7 +181,13 @@
             const icon = document.getElementById('refresh-icon');
             icon.classList.add('fa-spin');
             try {
-                const response = await fetch(FLOW_URL, { method: 'POST', body: JSON.stringify({ action: "Refresh" }) });
+                // FIXED: Explicitly added application/json header to fix "Expected Object but got String" error
+                const response = await fetch(FLOW_URL, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: "Refresh" }) 
+                });
+                
                 const data = await response.json();
                 if (response.ok) {
                     let rows = data.schema?.data || (typeof data.body === 'string' ? JSON.parse(data.body).value : data.value);
@@ -315,7 +320,7 @@
         function saveLocal(reRender = false) {
             const t = db.find(x => x.id === currentTicketId);
             if(t) t.notes = document.getElementById('d-notes').value;
-            localStorage.setItem('logistics_db_v38', JSON.stringify(db));
+            localStorage.setItem('logistics_db_v38_1', JSON.stringify(db));
             if (reRender) render();
         }
 
