@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logistics Command v38.1</title>
+    <title>Logistics Command v39.0</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -12,16 +12,22 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 
     <style>
-        body { font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        .app-grid { display: grid; grid-template-columns: 240px 1fr 400px; height: 100%; }
-        .nav-btn.active { background-color: #eff6ff; color: #2563eb; border-right: 4px solid #2563eb; }
+        body { font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; transition: background 0.3s ease; }
+        .app-grid { display: grid; grid-template-columns: 260px 1fr 400px; height: 100%; }
+        .nav-btn.active { background-color: var(--active-bg, #eff6ff); color: var(--brand-color, #2563eb); border-right: 4px solid var(--brand-color, #2563eb); }
         .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        tr.active-row { background-color: #f1f5f9 !important; border-left: 4px solid #3b82f6; }
+        tr.active-row { background-color: var(--active-bg, #eff6ff) !important; border-left: 4px solid var(--brand-color, #2563eb); }
         .table-cell { font-size: 11px; padding: 12px 8px; vertical-align: middle; }
+        
+        /* Themes */
+        .theme-default { --brand-color: #2563eb; --active-bg: #eff6ff; }
+        .theme-midnight { --brand-color: #6366f1; --active-bg: #e0e7ff; }
+        .theme-emerald { --brand-color: #059669; --active-bg: #ecfdf5; }
+        .theme-sunset { --brand-color: #ea580c; --active-bg: #fff7ed; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800">
+<body class="bg-slate-50 text-slate-800 theme-default" id="main-body">
 
     <div id="auth-screen" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center p-4">
         <div class="max-w-md w-full text-center space-y-8">
@@ -35,12 +41,25 @@
 
     <header class="h-16 bg-white border-b flex items-center justify-between px-6 z-10">
         <div class="flex items-center gap-6">
-            <div class="text-xl font-black text-blue-600 tracking-tighter italic">LOGICOMMAND <span class="text-slate-400 text-[10px] font-normal not-italic ml-1">v38.1</span></div>
+            <div class="text-xl font-black text-[var(--brand-color)] tracking-tighter italic transition-colors">LOGICOMMAND <span class="text-slate-400 text-[10px] font-normal not-italic ml-1">v39.0</span></div>
             <div class="relative">
                 <i class="fa fa-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
-                <input type="text" id="global-search" oninput="render()" placeholder="Search by Driver, Company, Rep, or Order..." class="bg-slate-100 border-none rounded-lg pl-9 pr-4 py-2 text-xs w-80 focus:ring-2 ring-blue-500 transition outline-none">
+                <input type="text" id="global-search" oninput="render()" placeholder="Search anything..." class="bg-slate-100 border-none rounded-lg pl-9 pr-4 py-2 text-xs w-64 focus:ring-2 ring-blue-500 transition outline-none">
             </div>
         </div>
+        
+        <div class="flex items-center gap-3">
+            <select id="filter-rep" onchange="render()" class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-bold outline-none focus:ring-2 ring-blue-500">
+                <option value="ALL">ALL SALES REPS</option>
+            </select>
+            <select id="filter-status" onchange="render()" class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-bold outline-none focus:ring-2 ring-blue-500">
+                <option value="ALL">ALL DISPOSITIONS</option>
+                <option value="Pending">PENDING</option>
+                <option value="Completed">COMPLETED</option>
+                <option value="Escalated">ESCALATED</option>
+            </select>
+        </div>
+
         <div class="flex items-center gap-4">
             <div class="text-right">
                 <p id="user-display-name" class="text-xs font-bold leading-none">Guest User</p>
@@ -59,40 +78,46 @@
                     <i class="fa fa-database"></i> Full Archive
                 </button>
             </nav>
+
+            <div class="space-y-2">
+                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">Color Themes</p>
+                <div class="grid grid-cols-4 gap-2 px-2">
+                    <button onclick="setTheme('theme-default')" class="w-6 h-6 rounded-full bg-blue-600 border-2 border-white shadow-sm"></button>
+                    <button onclick="setTheme('theme-midnight')" class="w-6 h-6 rounded-full bg-indigo-600 border-2 border-white shadow-sm"></button>
+                    <button onclick="setTheme('theme-emerald')" class="w-6 h-6 rounded-full bg-emerald-600 border-2 border-white shadow-sm"></button>
+                    <button onclick="setTheme('theme-sunset')" class="w-6 h-6 rounded-full bg-orange-600 border-2 border-white shadow-sm"></button>
+                </div>
+            </div>
             
             <div class="mt-auto space-y-4">
                 <div class="bg-slate-900 p-4 rounded-2xl text-white shadow-lg">
-                    <div class="flex justify-between items-center mb-3">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase">Load Stats</span>
-                        <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                    </div>
                     <div class="flex justify-between items-end">
                         <div>
                             <p id="stat-pending" class="text-2xl font-black leading-none">0</p>
-                            <p class="text-[9px] font-bold text-slate-400 uppercase mt-1">Pending Tickets</p>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase mt-1">Pending</p>
                         </div>
                         <div class="text-right">
                             <p id="stat-total" class="text-lg font-bold text-slate-500 leading-none">0</p>
-                            <p class="text-[9px] font-bold text-slate-400 uppercase mt-1">Total</p>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase mt-1">Visible</p>
                         </div>
                     </div>
                 </div>
-                <button onclick="fetchLiveData()" class="w-full py-4 bg-blue-600 text-white rounded-xl font-bold text-xs shadow-lg hover:bg-blue-700 transition flex items-center justify-center gap-2">
-                    <i class="fas fa-sync-alt" id="refresh-icon"></i> Refresh Flow
+                <button onclick="fetchLiveData()" id="refresh-btn" class="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:brightness-110 transition-all flex items-center justify-center gap-2">
+                    <i class="fas fa-sync-alt" id="refresh-icon"></i> <span id="refresh-text">Refresh Now</span>
                 </button>
             </div>
         </aside>
 
         <main class="bg-white overflow-hidden border-r">
             <div class="overflow-auto custom-scroll h-full">
-                <table class="w-full text-left border-collapse min-w-[1100px]">
+                <table class="w-full text-left border-collapse min-w-[1000px]">
                     <thead class="sticky top-0 bg-slate-50 border-b z-10">
-                        <tr class="text-[10px] uppercase text-slate-500 font-black">
-                            <th class="p-4 bg-slate-50">Customer / Order #</th>
-                            <th class="p-4 bg-slate-50">WHSE / Route</th>
-                            <th class="p-4 bg-slate-50">Driver & Phone</th>
-                            <th class="p-4 bg-slate-50">Submitted By</th>
-                            <th class="p-4 bg-slate-50">Status</th>
+                        <tr class="text-[9px] uppercase text-slate-500 font-black">
+                            <th class="p-4">Customer / Order</th>
+                            <th class="p-4">WHSE / Route</th>
+                            <th class="p-4">Driver</th>
+                            <th class="p-4">Rep</th>
+                            <th class="p-4 text-center">Disposition</th>
                         </tr>
                     </thead>
                     <tbody id="ticket-list" class="divide-y divide-slate-100"></tbody>
@@ -103,7 +128,7 @@
         <aside id="detail-panel" class="bg-white overflow-y-auto custom-scroll hidden border-l shadow-2xl">
             <div class="p-6 space-y-6">
                 <div class="grid grid-cols-3 gap-2">
-                    <a id="btn-call" href="#" class="flex flex-col items-center justify-center p-3 bg-slate-50 border rounded-xl hover:bg-green-600 hover:text-white transition">
+                    <a id="btn-call" href="#" class="flex flex-col items-center justify-center p-3 bg-slate-50 border rounded-xl hover:bg-green-600 hover:text-white transition group">
                         <i class="fa fa-phone mb-1"></i><span class="text-[9px] font-black uppercase">Call</span>
                     </a>
                     <a id="btn-text" href="#" class="flex flex-col items-center justify-center p-3 bg-slate-50 border rounded-xl hover:bg-blue-600 hover:text-white transition">
@@ -130,11 +155,11 @@
 
                 <div class="space-y-4">
                     <div>
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Logistics Agent Notes</label>
-                        <textarea id="d-notes" oninput="saveLocal()" class="w-full mt-2 p-4 rounded-xl border h-32 text-xs focus:ring-2 ring-blue-500 outline-none bg-slate-50" placeholder="Type driver/whse updates here..."></textarea>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Logistics Notes</label>
+                        <textarea id="d-notes" oninput="saveLocal()" class="w-full mt-2 p-4 rounded-xl border h-32 text-xs focus:ring-2 ring-blue-500 outline-none bg-slate-50" placeholder="Driver updates..."></textarea>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="setStatus('Completed')" class="flex-1 py-4 bg-green-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-green-700 transition">Complete</button>
+                        <button onclick="setStatus('Completed')" class="flex-1 py-4 bg-green-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-green-700 transition shadow-lg">Complete</button>
                         <button onclick="setStatus('Escalated')" class="px-6 bg-slate-200 text-slate-700 rounded-xl font-black text-xs uppercase hover:bg-red-600 hover:text-white transition">Escalate</button>
                     </div>
                 </div>
@@ -155,7 +180,7 @@
             cache: { cacheLocation: "localStorage" }
         });
 
-        let db = JSON.parse(localStorage.getItem('logistics_db_v38_1')) || [];
+        let db = JSON.parse(localStorage.getItem('logistics_db_v39')) || [];
         let currentMode = 'today';
         let currentTicketId = null;
 
@@ -166,6 +191,7 @@
                 document.getElementById('user-display-name').innerText = accounts[0].name;
                 document.getElementById('auth-screen').classList.add('hidden');
                 document.getElementById('app-ui').classList.remove('hidden');
+                updateFilters();
                 render(); 
                 fetchLiveData();
             }
@@ -179,22 +205,28 @@
 
         async function fetchLiveData() {
             const icon = document.getElementById('refresh-icon');
+            const text = document.getElementById('refresh-text');
             icon.classList.add('fa-spin');
+            text.innerText = "Refreshing...";
+            
             try {
-                // FIXED: Explicitly added application/json header to fix "Expected Object but got String" error
                 const response = await fetch(FLOW_URL, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: "Refresh" }) 
                 });
-                
                 const data = await response.json();
                 if (response.ok) {
                     let rows = data.schema?.data || (typeof data.body === 'string' ? JSON.parse(data.body).value : data.value);
                     if (rows) ingest(rows);
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                console.error(e);
+                Toastify({ text: "Flow Sync Failed", style: { background: "#ef4444" } }).showToast();
+            }
+            
             icon.classList.remove('fa-spin');
+            text.innerText = "Refresh Now";
         }
 
         function val(row, terms) {
@@ -221,7 +253,7 @@
                     whse: val(r, ['warehouse']),
                     route: val(r, ['route']),
                     rep: val(r, ['name', 'submittedby', 'rep']),
-                    driverName: driverData.split(/[0-9]/)[0].trim(),
+                    driverName: driverData.split(/[0-9]/)[0].replace(/[^\w\s]/g, '').trim(),
                     driverPhone: phoneMatch ? phoneMatch[0] : 'No Phone',
                     issue: val(r, ['issue']),
                     desc: val(r, ['description']),
@@ -236,46 +268,71 @@
                 }
             });
             document.getElementById('sync-clock').innerText = `Synced: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            updateFilters();
             saveLocal(true);
+        }
+
+        function updateFilters() {
+            const repSelect = document.getElementById('filter-rep');
+            const currentRep = repSelect.value;
+            const reps = [...new Set(db.map(t => t.rep))].filter(Boolean).sort();
+            
+            repSelect.innerHTML = '<option value="ALL">ALL SALES REPS</option>';
+            reps.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r;
+                opt.textContent = r.toUpperCase();
+                repSelect.appendChild(opt);
+            });
+            repSelect.value = currentRep;
         }
 
         function render() {
             const list = document.getElementById('ticket-list');
             const search = document.getElementById('global-search').value.toLowerCase();
+            const repFilter = document.getElementById('filter-rep').value;
+            const statFilter = document.getElementById('filter-status').value;
             list.innerHTML = '';
             const today = new Date().toISOString().split('T')[0];
             
             const filtered = db.filter(t => (currentMode === 'all' || t.date === today))
+                               .filter(t => repFilter === 'ALL' || t.rep === repFilter)
+                               .filter(t => statFilter === 'ALL' || t.status === statFilter)
                                .filter(t => JSON.stringify(t).toLowerCase().includes(search))
                                .sort((a,b) => b.timestamp - a.timestamp);
 
             document.getElementById('stat-total').innerText = filtered.length;
-            document.getElementById('stat-pending').innerText = filtered.filter(x => x.status !== 'Completed').length;
+            document.getElementById('stat-pending').innerText = db.filter(x => x.status !== 'Completed' && x.date === today).length;
 
             filtered.forEach(t => {
                 const tr = document.createElement('tr');
-                tr.className = `hover:bg-blue-50 cursor-pointer transition border-b ${currentTicketId === t.id ? 'active-row bg-blue-50' : ''}`;
+                tr.className = `hover:bg-slate-50 cursor-pointer transition border-b ${currentTicketId === t.id ? 'active-row' : ''}`;
                 tr.onclick = () => loadTicket(t.id);
                 tr.innerHTML = `
                     <td class="table-cell">
                         <div class="font-bold text-slate-900 text-xs">${t.company}</div>
-                        <div class="text-[10px] text-blue-600 font-bold uppercase">SO# ${t.order || '---'}</div>
+                        <div class="text-[9px] text-blue-600 font-bold uppercase tracking-tight">SO# ${t.order || '---'}</div>
                     </td>
                     <td class="table-cell">
                         <div class="font-bold text-slate-700">${t.whse || '---'}</div>
-                        <div class="text-[10px] text-slate-400">Route ${t.route || '---'}</div>
+                        <div class="text-[9px] text-slate-400 font-bold">R: ${t.route || '---'}</div>
                     </td>
                     <td class="table-cell">
                         <div class="font-bold text-slate-700">${t.driverName || '---'}</div>
-                        <div class="text-blue-500 font-mono text-[10px]">${t.driverPhone}</div>
+                        <div class="text-blue-500 font-mono text-[9px]">${t.driverPhone}</div>
                     </td>
-                    <td class="table-cell text-slate-500 font-medium">${t.rep || '---'}</td>
-                    <td class="table-cell">
+                    <td class="table-cell text-slate-500 font-bold uppercase text-[10px]">${t.rep || '---'}</td>
+                    <td class="table-cell text-center">
                         <span class="text-[9px] font-black uppercase px-2 py-1 rounded ${t.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${t.status}</span>
                     </td>
                 `;
                 list.appendChild(tr);
             });
+        }
+
+        function setTheme(t) {
+            document.getElementById('main-body').className = 'bg-slate-50 text-slate-800 ' + t;
+            localStorage.setItem('logi_theme', t);
         }
 
         function loadTicket(id) {
@@ -290,14 +347,14 @@
             document.getElementById('d-notes').value = t.notes || '';
             
             if(t.driverPhone !== 'No Phone') {
-                document.getElementById('btn-call').href = `tel:${t.driverPhone}`;
+                document.getElementById('btn-call').onclick = () => { window.location.href = `tel:${t.driverPhone}`; addAudit("Called Driver"); };
                 document.getElementById('btn-text').href = `sms:${t.driverPhone}&body=WB Logistics regarding delivery to ${t.company}: `;
             }
             document.getElementById('btn-email').href = `mailto:logistics@wbmason.com?subject=ID ${t.id} - ${t.company}&body=Hi Warehouse, inquiring about route ${t.route}...`;
 
             const badge = document.getElementById('d-status-badge');
             badge.innerText = t.status;
-            badge.className = `px-2 py-1 rounded text-[9px] font-black uppercase ${t.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`;
+            badge.className = `px-2 py-0.5 rounded text-[9px] font-black uppercase ${t.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`;
             
             document.getElementById('d-audit').innerHTML = (t.audit || []).slice(-5).reverse().map(a => `
                 <div class="text-[10px] bg-slate-50 p-2 rounded border border-slate-100 text-slate-500">
@@ -311,16 +368,23 @@
             const t = db.find(x => x.id === currentTicketId);
             if(t) { 
                 t.status = s; 
-                if(!t.audit) t.audit = [];
-                t.audit.push({ time: new Date().toLocaleTimeString(), msg: `Marked as ${s}` });
+                addAudit(`Marked as ${s}`);
                 saveLocal(true); 
+            }
+        }
+
+        function addAudit(msg) {
+            const t = db.find(x => x.id === currentTicketId);
+            if(t) {
+                if(!t.audit) t.audit = [];
+                t.audit.push({ time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), msg: msg });
             }
         }
 
         function saveLocal(reRender = false) {
             const t = db.find(x => x.id === currentTicketId);
             if(t) t.notes = document.getElementById('d-notes').value;
-            localStorage.setItem('logistics_db_v38_1', JSON.stringify(db));
+            localStorage.setItem('logistics_db_v39', JSON.stringify(db));
             if (reRender) render();
         }
 
