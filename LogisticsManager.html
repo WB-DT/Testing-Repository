@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logistics Manager v41.2 (Map & Navigation)</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://alcdn.msauth.net/browser/2.14.2/js/msal-browser.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { 
+                extend: { 
+                    colors: { 
+                        slate: { 850: '#1a202c', 900: '#0f172a', 950: '#020617' },
+                        primary: { 500: '#3b82f6', 600: '#2563eb' }
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    animation: { 'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite' }
+                } 
+            }
+        }
+    </script>
+
+    <style>
+        /* --- THEME VARIABLES --- */
+        :root {
+            --bg-main: #f8fafc; --bg-panel: #ffffff; --text-main: #0f172a; --text-muted: #64748b;
+            --border: #e2e8f0; --primary: #3b82f6; --primary-light: #eff6ff; --card-hover: #f1f5f9;
+        }
+        .dark {
+            --bg-main: #020617; --bg-panel: #0f172a; --text-main: #f8fafc; --text-muted: #94a3b8;
+            --border: #1e293b; --primary: #3b82f6; --primary-light: #1e3a8a; --card-hover: #1e293b;
+        }
+        /* Ocean Theme */
+        body.theme-ocean { --bg-main: #f0f9ff; --bg-panel: #ffffff; --primary: #0ea5e9; --primary-light: #e0f2fe; }
+        body.theme-ocean.dark { --bg-main: #0c4a6e; --bg-panel: #075985; --text-main: #f0f9ff; --primary: #38bdf8; --border: #0369a1; --card-hover: #0c4a6e; }
+        /* Forest Theme */
+        body.theme-forest { --bg-main: #f0fdf4; --bg-panel: #ffffff; --primary: #22c55e; --primary-light: #dcfce7; }
+        body.theme-forest.dark { --bg-main: #052e16; --bg-panel: #14532d; --text-main: #f0fdf4; --primary: #4ade80; --border: #166534; --card-hover: #052e16; }
+
+        /* CORE */
+        body { font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-main); color: var(--text-main); transition: background 0.3s, color 0.3s; }
+        .app-grid { display: grid; grid-template-columns: 260px 1fr; height: 100%; overflow: hidden; }
+        
+        /* SCROLLBARS */
+        .custom-scroll { scrollbar-width: thin; scrollbar-color: var(--text-muted) transparent; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+        
+        /* COMMON ELEMENTS */
+        .panel-bg { background: var(--bg-panel); border-right: 1px solid var(--border); }
+        .border-theme { border-color: var(--border); }
+        
+        /* VIRTUAL LIST */
+        #virtual-list { position: relative; overflow-y: auto; height: 100%; outline: none; contain: strict; }
+        #virtual-height { width: 1px; opacity: 0; }
+        #virtual-content { position: absolute; top: 0; left: 0; width: 100%; will-change: transform; }
+
+        /* CARDS */
+        .ticket-card { height: 90px; box-sizing: border-box; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; border-left: 4px solid transparent; position: relative; background: var(--bg-panel); }
+        .ticket-card:hover { background-color: var(--card-hover); }
+        .ticket-card.selected { border-left-color: var(--primary); background-color: var(--primary-light); }
+        .stale-ticket { background-color: rgba(239, 68, 68, 0.1); } /* Red tint */
+
+        /* KANBAN */
+        .kanban-board { display: flex; height: 100%; overflow-x: auto; padding: 16px; gap: 16px; min-height: 0; }
+        .kanban-col { min-width: 320px; width: 320px; background: var(--card-hover); border-radius: 12px; display: flex; flex-direction: column; max-height: 100%; border: 1px solid var(--border); overflow: hidden; }
+        .kanban-header { padding: 12px; font-weight: bold; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; background: var(--bg-panel); }
+        .kanban-body { flex-grow: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+        .kanban-card { background: var(--bg-panel); padding: 12px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; border: 1px solid transparent; flex-shrink: 0; }
+        .kanban-card:hover { border-color: var(--primary); transform: translateY(-1px); }
+
+        /* REPS & ROUTE VIEW (ACCORDIONS) */
+        .group-container { height: 100%; overflow-y: auto; padding: 16px; min-height: 0; }
+        .expand-group { margin-bottom: 16px; background: var(--bg-panel); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; flex-shrink: 0; }
+        .expand-summary { padding: 12px 16px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: space-between; background: var(--card-hover); position: sticky; top: 0; z-index: 10; user-select: none; }
+        .expand-summary:hover { background: var(--border); }
+        .expand-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; padding: 16px; }
+
+        .stat-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: 0.2s; }
+        .stat-card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+        .progress-fill { height: 100%; background: var(--primary); transition: width 0.5s; }
+
+        /* GRID TABLE */
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        .data-table th { position: sticky; top: 0; background: var(--bg-panel); z-index: 10; text-align: left; padding: 10px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border); }
+        .data-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); }
+        .data-table tr:hover { background: var(--primary-light); cursor: pointer; }
+
+        /* LEAFLET MAP */
+        #map-container { width: 100%; height: 100%; background: #e2e8f0; }
+        .leaflet-popup-content { font-family: 'Inter', sans-serif; font-size: 12px; color: #0f172a; }
+        .marker-urgent { filter: hue-rotate(140deg) brightness(0.8) saturate(3); } /* Shift blue to red roughly */
+
+        /* FOCUS OVERLAY */
+        #focus-overlay { position: fixed; inset: 0; background: var(--bg-main); z-index: 50; display: grid; grid-template-rows: 60px 1fr 70px; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); overflow: hidden; }
+        #focus-overlay.active { transform: translateY(0); }
+
+        #drop-zone { pointer-events: none; opacity: 0; transition: opacity 0.2s; z-index: 9999; backdrop-filter: blur(4px); }
+        #drop-zone.active { opacity: 1; pointer-events: all; }
+        #restore-toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); background: #334155; color: white; padding: 12px 24px; rounded-lg; display: flex; align-items: center; gap: 15px; z-index: 10000; transition: transform 0.5s; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #restore-toast.visible { transform: translateX(-50%) translateY(0); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200" ondragover="window.dragOverHandler(event);" ondrop="window.dropHandler(event);" ondragleave="window.dragLeaveHandler(event);">
+
+    <div id="restore-toast">
+        <div class="flex flex-col">
+            <span class="font-bold text-sm">Unsaved Session Found</span>
+            <span class="text-[10px] opacity-70">Recover your work?</span>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="window.restoreSession()" class="bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-green-600 transition">RESTORE</button>
+            <button onclick="window.discardSession()" class="bg-gray-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-gray-500 transition">DISCARD</button>
+        </div>
+    </div>
+
+    <div class="fixed top-3 right-4 z-50 group">
+        <button class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center hover:scale-110 transition"><i class="fas fa-palette"></i></button>
+        <div class="absolute right-0 mt-2 w-32 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden hidden group-hover:block">
+            <button onclick="window.setTheme('dark')" class="w-full text-left px-4 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-700">Midnight</button>
+            <button onclick="window.setTheme('light')" class="w-full text-left px-4 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-700">Professional</button>
+            <button onclick="window.setTheme('ocean')" class="w-full text-left px-4 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-700">Ocean</button>
+            <button onclick="window.setTheme('forest')" class="w-full text-left px-4 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-700">Forest</button>
+        </div>
+    </div>
+
+    <div id="drop-zone" class="fixed inset-0 bg-blue-500/20 flex flex-col items-center justify-center border-4 border-blue-500 border-dashed m-4 rounded-3xl">
+        <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl text-center transform scale-110 border border-slate-200 dark:border-slate-700">
+            <i class="fas fa-save text-5xl text-blue-500 animate-bounce mb-4"></i>
+            <h2 class="text-2xl font-bold">Import Data</h2>
+            <p class="text-sm opacity-70">Release to process</p>
+        </div>
+    </div>
+
+    <div id="auth-screen" class="fixed inset-0 bg-white dark:bg-slate-950 z-50 flex flex-col items-center justify-center p-4 transition-opacity duration-500">
+        <div class="max-w-md w-full text-center space-y-8 animate-fade-in-up">
+            <div class="inline-flex p-5 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-5xl shadow-2xl shadow-blue-500/30">
+                <i class="fas fa-memory"></i>
+            </div>
+            <div>
+                <h1 class="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Logistics Manager</h1>
+                <p class="text-slate-500 dark:text-slate-400 mt-2 font-medium">v41.1 Map & Nav</p>
+            </div>
+            
+            <div id="login-container" class="space-y-4">
+                <button onclick="window.login()" class="w-full py-3.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold hover:scale-[1.02] transition shadow-xl flex items-center justify-center gap-3">
+                    <i class="fab fa-microsoft text-xl"></i> Sign In
+                </button>
+                <button onclick="window.bypassAuth()" class="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 uppercase tracking-widest transition">
+                    Offline Mode
+                </button>
+            </div>
+
+            <div id="progress-container" class="hidden w-full space-y-2">
+                <div class="flex justify-between text-xs font-bold text-slate-500 uppercase">
+                    <span id="progress-step">Initializing...</span>
+                    <span id="progress-percent">0%</span>
+                </div>
+                <div class="h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div id="progress-bar" class="h-full bg-blue-600 transition-all duration-300 w-0"></div>
+                </div>
+                <div id="file-upload-fallback" class="hidden mt-6 text-center border-t border-slate-200 dark:border-slate-800 pt-4">
+                     <p class="text-xs text-slate-400 mb-3">Live connection failed. Upload manually:</p>
+                     <button onclick="document.getElementById('fileInput').click()" class="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-lg text-xs font-bold transition">
+                        Select File
+                     </button>
+                     <input type="file" id="fileInput" class="hidden" accept=".xlsx, .csv" onchange="window.handleFile(this)">
+                </div>
+            </div>
+            <p id="error-display" class="text-red-500 text-xs hidden bg-red-100 dark:bg-red-900/30 p-2 rounded border border-red-200 dark:border-red-800 mt-4 break-all"></p>
+        </div>
+    </div>
+
+    <div id="app-ui" class="app-grid hidden">
+        <div class="panel-bg flex flex-col z-20 shadow-2xl relative h-full overflow-hidden">
+            <div class="p-6 flex-shrink-0">
+                <div class="text-lg font-black tracking-tight flex items-center gap-2">
+                    <span class="text-blue-500 text-2xl"><i class="fas fa-cube"></i></span> LOGI<span class="opacity-50">OPT</span>
+                </div>
+            </div>
+
+            <div class="flex-grow px-4 space-y-6 overflow-y-auto custom-scroll">
+                <div class="space-y-1">
+                    <div class="text-[10px] font-bold opacity-50 uppercase tracking-widest mb-2 pl-2">Dashboards</div>
+                    <button onclick="window.setFilterMode('today')" id="nav-today" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold opacity-70 hover:opacity-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between group">
+                        <span class="flex items-center gap-3"><i class="fas fa-calendar-day text-blue-500"></i> Live Today</span>
+                        <span id="count-today" class="bg-slate-200 dark:bg-slate-800 group-hover:bg-blue-600 group-hover:text-white px-2 py-0.5 rounded text-[10px]">0</span>
+                    </button>
+                    <button onclick="window.setFilterMode('urgent')" id="nav-urgent" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold opacity-70 hover:opacity-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between group">
+                        <span class="flex items-center gap-3"><i class="fas fa-fire text-red-500 animate-pulse"></i> Urgent</span>
+                        <span id="count-urgent" class="bg-slate-200 dark:bg-slate-800 group-hover:bg-red-600 group-hover:text-white px-2 py-0.5 rounded text-[10px]">0</span>
+                    </button>
+                    <button onclick="window.setFilterMode('all')" id="nav-all" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-bold text-white bg-blue-600 shadow-lg shadow-blue-900/20 flex items-center justify-between group mt-2">
+                        <span class="flex items-center gap-3"><i class="fas fa-database"></i> Database</span>
+                        <span id="count-all" class="bg-white/20 text-white px-2 py-0.5 rounded text-[10px]">0</span>
+                    </button>
+                </div>
+
+                <div class="space-y-1 pt-4 border-t border-theme">
+                    <div class="text-[10px] font-bold opacity-50 uppercase tracking-widest mb-2 pl-2">Views</div>
+                    <button onclick="window.changeView('list')" id="view-list" class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold bg-slate-800 text-white transition flex gap-3"><i class="fas fa-list w-4"></i> List View</button>
+                    <button onclick="window.changeView('kanban')" id="view-kanban" class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold opacity-70 hover:bg-slate-100 dark:hover:bg-slate-800 hover:opacity-100 transition flex gap-3"><i class="fas fa-columns w-4"></i> Kanban</button>
+                    <button onclick="window.changeView('grid')" id="view-grid" class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold opacity-70 hover:bg-slate-100 dark:hover:bg-slate-800 hover:opacity-100 transition flex gap-3"><i class="fas fa-table w-4"></i> Excel Grid</button>
+                    <button onclick="window.changeView('reps')" id="view-reps" class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold opacity-70 hover:bg-slate-100 dark:hover:bg-slate-800 hover:opacity-100 transition flex gap-3"><i class="fas fa-users w-4"></i> Rep Load</button>
+                    <button onclick="window.changeView('route')" id="view-route" class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold opacity-70 hover:bg-slate-100 dark:hover:bg-slate-800 hover:opacity-100 transition flex gap-3"><i class="fas fa-truck w-4"></i> Route Cmd</button>
+                    <button onclick="window.changeView('map')" id="view-map" class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold opacity-70 hover:bg-slate-100 dark:hover:bg-slate-800 hover:opacity-100 transition flex gap-3"><i class="fas fa-map w-4"></i> Map</button>
+                </div>
+
+                <div class="space-y-4 pt-4 border-t border-theme">
+                    <div class="text-[10px] font-bold opacity-50 uppercase tracking-widest pl-2">Filters</div>
+                    <div>
+                         <label class="text-[10px] opacity-70 mb-1.5 block pl-1">Record Type</label>
+                         <select id="filter-type" onchange="window.triggerRender()" class="w-full bg-transparent text-xs rounded-lg p-2.5 border border-theme focus:border-blue-500 outline-none transition cursor-pointer">
+                             <option value="all">All Types</option>
+                             <option value="Text-A-Driver">Text-A-Driver</option>
+                             <option value="Ticket">Support Ticket</option>
+                         </select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] opacity-70 mb-1.5 block pl-1">Ownership</label>
+                        <select id="filter-owner" onchange="window.triggerRender()" class="w-full bg-transparent text-xs rounded-lg p-2.5 border border-theme focus:border-blue-500 outline-none transition cursor-pointer">
+                            <option value="all">Show Everyone</option>
+                            <option value="me">My Queue Only</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] opacity-70 mb-1.5 block pl-1">Route</label>
+                        <select id="filter-route" onchange="window.triggerRender()" class="w-full bg-transparent text-xs rounded-lg p-2.5 border border-theme focus:border-blue-500 outline-none transition cursor-pointer">
+                            <option value="all">All Routes</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] opacity-70 mb-1.5 block pl-1">Date Range</label>
+                        <input type="text" id="date-picker" placeholder="Filter by Date..." class="w-full bg-transparent text-xs rounded-lg p-2.5 pl-8 border border-theme focus:border-blue-500 outline-none transition cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-theme bg-slate-900/5 flex-shrink-0">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-lg" id="user-initial">U</div>
+                    <div class="overflow-hidden">
+                        <div class="text-xs font-bold truncate" id="user-name">User</div>
+                        <div class="text-[10px] opacity-70 truncate" id="user-email">user@wbmason.com</div>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="window.exportData(false)" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold py-2 rounded-lg transition shadow-lg">Export All</button>
+                    <button onclick="window.exportData(true)" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-2 rounded-lg transition shadow-lg" title="Export Only Changes">Diff</button>
+                </div>
+                <button onclick="window.resetApp()" class="w-full text-xs opacity-50 hover:opacity-100 hover:text-red-500 mt-4 underline">Reset Application</button>
+            </div>
+        </div>
+
+        <div id="main-panel" class="flex flex-col relative z-10 border-r border-theme overflow-hidden h-full bg-main">
+            <div class="px-4 py-3 border-b border-theme flex items-center gap-3 bg-panel sticky top-0 z-20 flex-shrink-0">
+                <div class="relative flex-grow group">
+                    <i class="fas fa-search absolute left-3 top-2.5 opacity-50 text-xs group-focus-within:text-blue-500 transition"></i>
+                    <input type="text" id="search-input" onkeyup="window.debouncedSearch()" placeholder="Search... (Try 'route:BOY', 'status:Escalated')" class="w-full bg-slate-100 dark:bg-slate-800 pl-9 pr-4 py-2 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all border border-transparent">
+                </div>
+                <button onclick="window.toggleAnalytics()" class="p-2 opacity-50 hover:opacity-100 hover:text-blue-500"><i class="fas fa-chart-pie"></i></button>
+            </div>
+
+            <div class="flex border-b border-theme text-xs font-bold opacity-70 overflow-x-auto custom-scroll bg-slate-50/50 dark:bg-slate-900/50 flex-shrink-0">
+                <button onclick="window.setStatusFilter('all')" id="tab-all" class="nav-item active px-4 py-3 hover:text-blue-500 whitespace-nowrap transition-colors">All</button>
+                <button onclick="window.setStatusFilter('Pending')" id="tab-pending" class="nav-item px-4 py-3 hover:text-blue-500 whitespace-nowrap transition-colors">Pending</button>
+                <button onclick="window.setStatusFilter('Escalated')" id="tab-escalated" class="nav-item px-4 py-3 hover:text-blue-500 whitespace-nowrap transition-colors">Escalated</button>
+                <button onclick="window.setStatusFilter('Completed')" id="tab-completed" class="nav-item px-4 py-3 hover:text-blue-500 whitespace-nowrap transition-colors">Completed</button>
+            </div>
+
+            <div id="main-view-area" class="flex-grow relative overflow-hidden bg-main">
+                <div id="virtual-list" tabindex="0" class="h-full overflow-y-auto outline-none">
+                    <div id="virtual-height"></div>
+                    <div id="virtual-content"></div>
+                </div>
+            </div>
+
+            <div class="px-3 py-2 border-t border-theme text-[10px] flex justify-between items-center opacity-50 bg-panel flex-shrink-0">
+                <span id="list-count-display">0 Items</span>
+                <span>System: <span class="text-green-500">v41.1 Stable</span></span>
+            </div>
+            
+             <div id="analytics-overlay" class="absolute inset-0 bg-panel z-30 flex flex-col overflow-y-auto hidden animate-fade-in p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold">Analytics Dashboard</h2>
+                    <button onclick="window.toggleAnalytics()" class="opacity-50 hover:opacity-100"><i class="fas fa-times text-xl"></i></button>
+                </div>
+                <div class="grid grid-cols-2 gap-6 mb-6">
+                    <div class="panel-bg p-4 rounded-xl border border-theme shadow-sm h-64"><canvas id="chart-issues"></canvas></div>
+                    <div class="panel-bg p-4 rounded-xl border border-theme shadow-sm h-64"><canvas id="chart-routes"></canvas></div>
+                </div>
+                <div class="panel-bg p-4 rounded-xl border border-theme shadow-sm h-64"><canvas id="chart-owners"></canvas></div>
+            </div>
+        </div>
+
+        <div id="focus-overlay" class="shadow-2xl">
+            <div class="h-[60px] border-b border-theme flex items-center justify-between px-6 bg-panel z-10">
+                <div class="flex items-center gap-4">
+                    <button onclick="window.closeFocus()" class="opacity-50 hover:opacity-100 transition flex items-center gap-2 text-xs font-bold uppercase"><i class="fas fa-arrow-left"></i> Back</button>
+                    <div class="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
+                    <h2 class="text-xl font-black tracking-tight" id="f-id">--</h2>
+                    <span id="f-badge" class="px-2.5 py-1 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-600 tracking-wide">--</span>
+                    <span id="focus-timer" class="text-xs font-mono opacity-50 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">00:00</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs opacity-50 mr-4 font-mono hidden md:inline">Ticket <span id="f-index">0</span> of <span id="f-total">0</span></span>
+                    <button onclick="window.navTicket(-1)" class="w-8 h-8 rounded-full border border-theme flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition"><i class="fas fa-chevron-left"></i></button>
+                    <button onclick="window.navTicket(1)" class="w-8 h-8 rounded-full border border-theme flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition"><i class="fas fa-chevron-right"></i></button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 h-full overflow-hidden bg-main">
+                <div class="p-8 overflow-y-auto border-r border-theme custom-scroll bg-slate-50/50 dark:bg-slate-950/50">
+                    <div class="max-w-2xl mx-auto space-y-8">
+                        <div>
+                            <h1 class="text-3xl font-bold leading-tight mb-2" id="f-customer">--</h1>
+                            <div class="flex flex-wrap gap-3 text-xs font-medium opacity-70">
+                                <span class="flex items-center gap-1.5"><i class="fas fa-hashtag"></i> <span id="f-acct">--</span></span>
+                                <span class="flex items-center gap-1.5"><i class="fas fa-route"></i> <span id="f-route">--</span></span>
+                                <span class="flex items-center gap-1.5"><i class="fas fa-warehouse"></i> <span id="f-whs">--</span></span>
+                                <span class="flex items-center gap-1.5"><i class="fas fa-tag"></i> <span id="f-type">--</span></span>
+                            </div>
+                        </div>
+                        <div class="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-2xl p-6">
+                            <div class="text-[10px] font-bold text-red-400 uppercase tracking-wide mb-2 flex justify-between"><span>Reported Issue</span><span id="f-date">--</span></div>
+                            <div class="text-lg font-bold text-red-900 dark:text-red-100 leading-snug" id="f-desc">--</div>
+                        </div>
+                        <div class="panel-bg border border-theme rounded-2xl p-6 shadow-sm">
+                            <div class="grid grid-cols-2 gap-6">
+                                <div>
+                                    <div class="text-[10px] font-bold opacity-50 uppercase tracking-wide mb-1">Driver</div>
+                                    <div class="font-bold text-lg" id="f-driver">--</div>
+                                </div>
+                                <div>
+                                    <div class="text-[10px] font-bold opacity-50 uppercase tracking-wide mb-1">Contact</div>
+                                    <div class="font-bold text-lg" id="f-contact">--</div>
+                                    <div class="flex gap-2 mt-2">
+                                        <button onclick="window.copyText('f-contact')" class="text-xs text-blue-500 hover:underline">Copy Name</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                             <label class="text-[10px] font-bold opacity-50 uppercase mb-2 block">Internal Notes</label>
+                             <div class="panel-bg border border-theme rounded-xl p-4 text-sm opacity-80 font-mono whitespace-pre-wrap" id="f-log-notes">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-8 overflow-y-auto custom-scroll panel-bg">
+                      <div class="max-w-xl mx-auto flex flex-col h-full">
+                          <div class="mb-6"><label class="text-[10px] font-bold opacity-50 uppercase mb-2 block">Assignment</label><select id="f-owner" class="w-full bg-slate-50 dark:bg-slate-800 border border-theme rounded-xl p-3 text-sm font-bold text-blue-600 dark:text-blue-400 cursor-pointer outline-none"><option value="">Unassigned</option></select></div>
+                          <div class="flex-grow flex flex-col mb-6">
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-[10px] font-bold opacity-50 uppercase">Resolution Notes</label>
+                                <div class="flex gap-2" id="snippet-container"></div>
+                                <button onclick="window.addSnippet()" class="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded font-bold hover:bg-blue-200">+</button>
+                            </div>
+                            <textarea id="f-notes" class="flex-grow w-full border border-theme rounded-xl p-4 text-base leading-relaxed focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-slate-50 dark:bg-slate-800 shadow-inner"></textarea>
+                         </div>
+                         <div class="mb-20"><label class="text-[10px] font-bold opacity-50 uppercase mb-2 block">Update Status</label><div class="grid grid-cols-2 gap-3">
+                             <button onclick="window.setFocusStatus('Pending')" class="py-3 rounded-xl border border-theme text-sm font-bold opacity-70 hover:opacity-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Pending</button>
+                             <button onclick="window.setFocusStatus('Completed')" class="py-3 rounded-xl bg-green-600 text-white text-sm font-bold hover:bg-green-700 shadow-md transition">Completed</button>
+                             <button onclick="window.setFocusStatus('Escalated')" class="py-3 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 shadow-md transition">Escalate</button>
+                             <button onclick="window.setFocusStatus('Working on')" class="py-3 rounded-xl border border-blue-200 dark:border-blue-900 text-blue-600 text-sm font-bold hover:bg-blue-50 dark:hover:bg-blue-900/30 transition">Working</button>
+                         </div></div>
+                     </div>
+                </div>
+            </div>
+            <div class="h-[70px] border-t border-theme bg-panel flex items-center justify-between px-8 z-10 absolute bottom-0 w-full">
+                <div class="text-xs opacity-50"><span class="hidden md:inline">Use Arrow Keys to Navigate</span></div>
+                <div class="flex gap-3"><button onclick="window.saveAndNext()" class="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl text-sm font-bold shadow-lg shadow-blue-500/30 transition transform active:scale-95 flex items-center gap-2"><i class="fas fa-save"></i> Save & Next</button></div>
+            </div>
+        </div>
+    </div>
+
+    <script id="worker-script" type="javascript/worker">
+        // ZIP CODE APPROXIMATION DICTIONARY (3-Digit Prefix -> Lat, Lon)
+        const ZIP_MAP = {
+            '010': [42.1, -72.6], '021': [42.3, -71.0], '100': [40.7, -74.0], '112': [40.6, -73.9], '131': [43.0, -76.1],
+            '191': [39.9, -75.1], '200': [38.9, -77.0], '303': [33.7, -84.3], '331': [25.7, -80.2], '606': [41.8, -87.6],
+            '752': [32.7, -96.8], '900': [34.0, -118.2], '981': [47.6, -122.3]
+            // Add more as needed or use a basic State map logic
+        };
+
+        let db = []; let filteredDB = []; 
+        let owners = []; let routes = []; let counts = { today: 0, urgent: 0, all: 0 };
+
+        self.onmessage = function(e) {
+            const { type, payload } = e.data;
+            if (type === 'PARSE') {
+                try {
+                    const raw = payload.data;
+                    self.postMessage({ type: 'PROGRESS', step: 'Parsing...', percent: 20 });
+                    const now = new Date();
+                    
+                    const val = (obj, k) => { 
+                        if(!obj) return ""; 
+                        const keys = Object.keys(obj);
+                        const cleanKeys = keys.reduce((acc, key) => {
+                            acc[key.toLowerCase().replace(/[^a-z0-9]/g, '')] = key;
+                            return acc;
+                        }, {});
+                        for(let i of k) {
+                            let cleanSearch = i.toLowerCase().replace(/[^a-z0-9]/g, '');
+                            if (cleanKeys[cleanSearch]) return obj[cleanKeys[cleanSearch]];
+                        }
+                        return ""; 
+                    };
+                    const safeDate = (v) => { if(!v) return ""; if(typeof v === 'number') { const d = new Date(Math.round((v - 25569)*86400000)); return d.toISOString().split('T')[0]; } return String(v).substring(0, 10); };
+                    const toProperCase = (str) => { if(!str || typeof str !== 'string') return str; return str.toLowerCase().replace(/\b\w/g, s => s.toUpperCase()); };
+
+                    db = raw.map(r => {
+                        const dateStr = safeDate(val(r, ['starttime','start_time','date']));
+                        const dateObj = new Date(dateStr);
+                        const isStale = !isNaN(dateObj) && ((now - dateObj) / 86400000) > 3;
+                        
+                        let statusRaw = val(r, ['disposition','dispo','status']) || 'Pending';
+                        let status = 'Pending';
+                        if(statusRaw.toLowerCase().includes('complete')) status = 'Completed';
+                        else if(statusRaw.toLowerCase().includes('escalat')) status = 'Escalated';
+                        else if(statusRaw.toLowerCase().includes('work')) status = 'Working on';
+                        
+                        const desc = val(r, ['description','description_x003a_','desc']);
+                        const issue = val(r, ['issue','issue_x003f_']);
+                        const isUrgent = (desc+issue).toLowerCase().match(/asap|refused|urgent|missing|return/);
+                        const tadNotes = val(r, ['receivedtextfromdrivernotes','receivedtext','driver_notes']);
+                        const recordType = (tadNotes && tadNotes.trim().length > 0) ? "Text-A-Driver" : "Ticket";
+                        
+                        // Extract Zip for Mapping
+                        const address = val(r, ['shippingaddress','shipping_address','address']);
+                        let zip3 = "000";
+                        const zipMatch = address.match(/\b\d{5}\b/);
+                        if(zipMatch) zip3 = zipMatch[0].substring(0, 3);
+
+                        return {
+                            id: val(r, ['id','ticket']),
+                            date: dateStr, isStale, isUrgent, recordType, zip3,
+                            cust: val(r, ['companynameandordeliverylocationname','company','company_name','name']),
+                            acct: val(r, ['accountnumber','account_number','account','acct']),
+                            so: val(r, ['salesordernumber','sales_order','so']),
+                            address: address,
+                            contact: toProperCase(val(r, ['contactnamenumberincludeext','contact','contact_name'])),
+                            route: val(r, ['route']),
+                            whs: val(r, ['warehousexxxxxinthisformatpleasex002e','warehouse','whs']),
+                            driverRaw: toProperCase(val(r, ['drivernamenumber','driver_name','driver'])),
+                            issue: issue, desc: desc,
+                            owner: toProperCase(val(r, ['logisticsowner','owner','logistics_owner'])),
+                            notes: tadNotes,
+                            lNotes: val(r, ['logisticsnotes','logisticsnotes_x003a_','logistics_notes','internalnotes']),
+                            wrhNotes: val(r, ['receivedemailfromwrhnotes']),
+                            email: val(r, ['email']), status: status,
+                            searchStr: (val(r, ['id'])+val(r, ['company'])+val(r, ['issue'])+val(r, ['route'])+val(r, ['drivernamenumber'])).toLowerCase() 
+                        };
+                    });
+
+                    self.postMessage({ type: 'PROGRESS', step: 'Indexing...', percent: 80 });
+                    owners = [...new Set(db.map(x=>x.owner).filter(x=>x))].sort();
+                    routes = [...new Set(db.map(x=>x.route).filter(x=>x))].sort((a,b)=>a.toString().localeCompare(b.toString(),undefined,{numeric:true}));
+                    counts = { today: db.filter(x => x.date === new Date().toISOString().split('T')[0]).length, urgent: db.filter(x => x.isUrgent && x.status !== 'Completed').length, all: db.length };
+                    filteredDB = db;
+                    self.postMessage({ type: 'INIT_COMPLETE', owners, routes, counts });
+                } catch(e) { self.postMessage({ type: 'ERROR', message: e.message }); }
+            }
+            else if (type === 'FILTER') {
+                const { filters } = payload;
+                const { search, route, owner, status, dateRange, mode, userEmail, recordType } = filters;
+                const todayStr = new Date().toISOString().split('T')[0];
+                let searchTerms = search; let sRoute=null, sStatus=null, sDriver=null, sIsUrgent=false;
+                if(search.includes(':')) {
+                    const parts = search.split(' '); searchTerms = "";
+                    parts.forEach(p => {
+                        if(p.startsWith('route:')) sRoute = p.split(':')[1];
+                        else if(p.startsWith('status:')) sStatus = p.split(':')[1];
+                        else if(p.startsWith('driver:')) sDriver = p.split(':')[1];
+                        else if(p.startsWith('is:urgent')) sIsUrgent = true;
+                        else searchTerms += p + " ";
+                    });
+                    searchTerms = searchTerms.trim();
+                }
+                filteredDB = db.filter(t => {
+                    if(mode === 'today' && t.date !== todayStr) return false;
+                    if(mode === 'urgent' && (!t.isUrgent || t.status === 'Completed')) return false;
+                    if(mode === 'mine' && (!t.owner || !t.owner.toLowerCase().includes(userEmail.split('@')[0]))) return false;
+                    if(status !== 'all' && t.status !== status) return false;
+                    if(mode !== 'mine' && owner !== 'all' && owner !== 'me' && t.owner !== owner) return false;
+                    if(route !== 'all' && t.route != route) return false;
+                    if(recordType !== 'all' && t.recordType !== recordType) return false;
+                    if(sRoute && !t.route.toLowerCase().includes(sRoute)) return false;
+                    if(sStatus && !t.status.toLowerCase().includes(sStatus)) return false;
+                    if(sDriver && !t.driverRaw.toLowerCase().includes(sDriver)) return false;
+                    if(sIsUrgent && !t.isUrgent) return false;
+                    if(dateRange.length > 0) { const d = new Date(t.date); if(d < new Date(dateRange[0]) || d > new Date(dateRange[1] || dateRange[0])) return false; }
+                    if(searchTerms && !t.searchStr.includes(searchTerms)) return false;
+                    return true;
+                });
+                self.postMessage({ type: 'FILTER_COMPLETE', count: filteredDB.length });
+            }
+            else if (type === 'GET_CHUNK') {
+                const { start, end } = payload;
+                const chunk = filteredDB.slice(start, end);
+                self.postMessage({ type: 'CHUNK_DATA', chunk, start });
+            }
+            else if (type === 'GET_KANBAN_DATA') {
+                const cols = { 'Pending': [], 'Working on': [], 'Escalated': [], 'Completed': [] };
+                const colCounts = { 'Pending': 0, 'Working on': 0, 'Escalated': 0, 'Completed': 0 };
+                filteredDB.forEach(t => { if (cols[t.status]) { colCounts[t.status]++; if (cols[t.status].length < 20) cols[t.status].push(t); } });
+                self.postMessage({ type: 'KANBAN_DATA', cols, colCounts });
+            }
+            else if (type === 'GET_GRID_DATA') {
+                const chunk = filteredDB.slice(0, 100);
+                self.postMessage({ type: 'GRID_DATA', chunk });
+            }
+            else if (type === 'GET_GROUPED_DATA') {
+                const { field } = payload; 
+                const groups = {};
+                filteredDB.forEach(t => {
+                   let k = t[field] || "Unassigned";
+                   let groupKey = k;
+                   if(field === 'route') groupKey = k.match(/^[A-Z]{2}/) ? k.substring(0,2) : "Other";
+                   else groupKey = (k === "Unassigned") ? "Unassigned" : k.charAt(0).toUpperCase(); 
+                   if (field === 'owner') groupKey = k;
+                   if(!groups[groupKey]) groups[groupKey] = {};
+                   if(!groups[groupKey][k]) groups[groupKey][k] = { total: 0, completed: 0, pending: 0 };
+                   groups[groupKey][k].total++;
+                   if(t.status === 'Completed') groups[groupKey][k].completed++; else groups[groupKey][k].pending++;
+                });
+                self.postMessage({ type: 'GROUPED_DATA', groups, field });
+            }
+            else if (type === 'GET_MAP_DATA') {
+                // Collect markers: { zip3: { lat, lon, count, urgentCount, tickets: [] } }
+                const mapData = {};
+                filteredDB.forEach(t => {
+                    if (t.zip3 && ZIP_MAP[t.zip3]) {
+                        if (!mapData[t.zip3]) mapData[t.zip3] = { lat: ZIP_MAP[t.zip3][0], lon: ZIP_MAP[t.zip3][1], count: 0, urgent: 0, sample: t };
+                        mapData[t.zip3].count++;
+                        if (t.isUrgent) mapData[t.zip3].urgent++;
+                        // Jitter slightly for visual distinctness if needed, or cluster
+                        // For this version, we return aggregate by region (zip3)
+                    }
+                });
+                self.postMessage({ type: 'MAP_DATA', points: Object.values(mapData) });
+            }
+            else if (type === 'GET_DETAIL') {
+                const id = payload.id;
+                const ticket = db.find(x => x.id === id);
+                self.postMessage({ type: 'DETAIL_DATA', ticket, index: filteredDB.findIndex(x=>x.id===id) });
+            }
+            else if (type === 'NAV_TICKET') {
+                const { currentId, dir } = payload;
+                const idx = filteredDB.findIndex(x => x.id === currentId);
+                if (idx !== -1) {
+                    const newIdx = idx + dir;
+                    if (newIdx >= 0 && newIdx < filteredDB.length) {
+                        const nextId = filteredDB[newIdx].id;
+                        const ticket = db.find(x => x.id === nextId);
+                        self.postMessage({ type: 'DETAIL_DATA', ticket, index: newIdx });
+                    }
+                }
+            }
+            else if (type === 'UPDATE_TICKET') {
+                const { id, updates } = payload;
+                const t = db.find(x => x.id === id);
+                if(t) { Object.assign(t, updates); }
+            }
+        };
+    </script>
+
+    <script>
+        const blob = new Blob([document.getElementById('worker-script').textContent], { type: "text/javascript" });
+        const worker = new Worker(URL.createObjectURL(blob));
+        const dbVault = new Dexie("LogisticsVault");
+        dbVault.version(1).stores({ tickets: "id, modifiedAt" });
+
+        const FLOW_URL = "https://49b71dde44f8e78e89bc0440816209.07.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/c8534a1735ca463d9386ac5ab1c89fcf/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=X3TCIX7rLqKbo5iiDAOozZ-JchO3BuPK5H8DW4aruAA";
+        const msalConfig = { auth: { clientId: "afe649b6-9c70-4b1a-8592-78588284c8ee", authority: "https://login.microsoftonline.com/9a7c474b-f702-4ae4-a2f9-b72a1e117401", redirectUri: window.location.href }, cache: { cacheLocation: "localStorage" } };
+        const msalInstance = new msal.PublicClientApplication(msalConfig);
+        
+        let currentUserEmail = ""; let currentTicketId = null;
+        let currentMode = 'all', currentStatus = 'all', currentView = 'list';
+        let dateFilter = null; let totalRecords = 0; let searchTimeout = null; let mapInstance = null;
+        let userSnippets = JSON.parse(localStorage.getItem('logi_snippets') || '["Left VM", "Wrong Addr", "Completed"]');
+        const ROW_HEIGHT = 90;
+        
+        worker.onmessage = function(e) {
+            const { type, count, chunk, start, ticket, index, groups, field, cols, colCounts, points, owners, step, percent } = e.data;
+            if (type === 'PROGRESS') {
+                document.getElementById('progress-step').innerText = step;
+                document.getElementById('progress-bar').style.width = percent + "%";
+            }
+            else if (type === 'INIT_COMPLETE') {
+                updateFiltersUI(e.data.owners, e.data.routes);
+                updateCountsUI(e.data.counts);
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('app-ui').classList.remove('hidden');
+                checkVault(); triggerRender();
+            } 
+            else if (type === 'FILTER_COMPLETE') {
+                totalRecords = count;
+                document.getElementById('list-count-display').innerText = `${count} Matches`;
+                if(currentView === 'list') { initVirtualScroll(); renderVirtualList(); }
+                else if (currentView === 'kanban') worker.postMessage({ type: 'GET_KANBAN_DATA' });
+                else if (currentView === 'grid') worker.postMessage({ type: 'GET_GRID_DATA' });
+                else if (currentView === 'route') worker.postMessage({ type: 'GET_GROUPED_DATA', payload: { field: 'route' } });
+                else if (currentView === 'reps') worker.postMessage({ type: 'GET_GROUPED_DATA', payload: { field: 'owner' } });
+                else if (currentView === 'map') worker.postMessage({ type: 'GET_MAP_DATA' });
+            }
+            else if (type === 'CHUNK_DATA') fillVirtualContent(chunk, start);
+            else if (type === 'KANBAN_DATA') renderKanbanDOM(cols, colCounts);
+            else if (type === 'GRID_DATA') renderGridDOM(chunk);
+            else if (type === 'GROUPED_DATA') renderGroupedDOM(groups, field);
+            else if (type === 'MAP_DATA') renderLeafletMap(points);
+            else if (type === 'DETAIL_DATA') openTicketOverlay(ticket, index);
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setTheme(localStorage.getItem('logi_theme') || 'dark');
+            dateFilter = flatpickr("#date-picker", { mode: "range", dateFormat: "Y-m-d", onChange: () => window.triggerRender() });
+            renderSnippets();
+        });
+
+        // --- VIEWS ---
+        function changeView(v) {
+            currentView = v;
+            document.querySelectorAll('[id^="view-"]').forEach(el => { el.classList.remove('bg-slate-800', 'text-white'); el.classList.add('opacity-70'); });
+            const btn = document.getElementById(`view-${v}`);
+            btn.classList.add('bg-slate-800', 'text-white'); btn.classList.remove('opacity-70');
+            
+            const container = document.getElementById('main-view-area');
+            container.innerHTML = "";
+            
+            if (v === 'list') {
+                container.innerHTML = '<div id="virtual-list" tabindex="0" class="h-full overflow-y-auto outline-none"><div id="virtual-height"></div><div id="virtual-content"></div></div>';
+                document.getElementById('virtual-list').addEventListener('scroll', handleScroll);
+                initVirtualScroll(); renderVirtualList();
+            } else {
+                triggerRender(); 
+            }
+        }
+
+        // --- VIRTUAL SCROLL ---
+        function initVirtualScroll() { if(document.getElementById('virtual-height')) document.getElementById('virtual-height').style.height = `${totalRecords * ROW_HEIGHT}px`; }
+        function handleScroll() { requestAnimationFrame(renderVirtualList); }
+        function renderVirtualList() {
+            const list = document.getElementById('virtual-list'); if(!list) return;
+            const scrollTop = list.scrollTop;
+            const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 2);
+            const endIndex = Math.min(totalRecords, Math.ceil((scrollTop + list.clientHeight) / ROW_HEIGHT) + 2); 
+            document.getElementById('virtual-content').style.transform = `translateY(${startIndex * ROW_HEIGHT}px)`;
+            worker.postMessage({ type: 'GET_CHUNK', payload: { start: startIndex, end: endIndex } });
+        }
+        function fillVirtualContent(chunk, start) {
+            const content = document.getElementById('virtual-content'); if(!content) return;
+            content.innerHTML = "";
+            chunk.forEach((t) => {
+                const el = document.createElement('div');
+                el.className = `ticket-card p-4 border-b border-theme ${t.id === currentTicketId ? 'selected' : ''} ${t.isStale && t.status==='Pending' ? 'stale-ticket' : ''}`;
+                el.onclick = () => loadTicket(t.id);
+                const badgeClass = t.status === 'Completed' ? 'bg-green-100 text-green-700' : (t.status === 'Escalated' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700');
+                el.innerHTML = `<div class="flex-grow min-w-0 pr-4"><div class="flex justify-between items-start mb-1"><span class="font-bold text-sm">#${t.id} ${t.isUrgent?'<i class="fas fa-fire text-red-500"></i>':''} <span class="text-[9px] bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded opacity-70">${t.recordType === 'Text-A-Driver' ? 'TAD' : 'TKT'}</span></span><span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded ${badgeClass}">${t.status}</span></div><div class="font-bold text-sm truncate mb-1" title="${t.cust}">${t.cust}</div><div class="flex justify-between items-center text-[10px] opacity-70"><span class="truncate max-w-[150px]">${t.issue}</span><span class="font-bold text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-900">${t.date.substring(5)}</span></div></div>`;
+                content.appendChild(el);
+            });
+        }
+
+        // --- RENDERERS ---
+        function renderKanbanDOM(cols, counts) {
+            document.getElementById('main-view-area').innerHTML = `<div class="kanban-board">${Object.keys(cols).map(k => `<div class="kanban-col"><div class="kanban-header"><span>${k}</span><span class="text-xs bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded">${counts[k]}</span></div><div class="kanban-body">${cols[k].map(t => `<div class="kanban-card" onclick="window.loadTicket('${t.id}')"><div class="font-bold text-xs mb-1">#${t.id}</div><div class="text-xs truncate mb-1">${t.cust}</div><div class="text-[10px] opacity-70">${t.issue}</div></div>`).join('')}</div></div>`).join('')}</div>`;
+        }
+        function renderGridDOM(chunk) {
+            const rows = chunk.map(t => `<tr onclick="window.loadTicket('${t.id}')"><td class="font-bold">#${t.id}</td><td><span class="text-[10px] bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded">${t.status}</span></td><td>${t.cust}</td><td>${t.route}</td><td>${t.driverRaw||'-'}</td><td>${t.issue}</td></tr>`).join('');
+            document.getElementById('main-view-area').innerHTML = `<div class="h-full overflow-auto"><table class="data-table"><thead><tr><th>ID</th><th>Status</th><th>Customer</th><th>Route</th><th>Driver</th><th>Issue</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+        }
+        function renderGroupedDOM(groups, field) {
+            const html = Object.keys(groups).sort().map(grpKey => {
+                const subItems = groups[grpKey];
+                const subKeys = Object.keys(subItems).sort();
+                const totalTickets = subKeys.reduce((acc, k) => acc + subItems[k].total, 0);
+                const cards = subKeys.map(k => {
+                    const d = subItems[k];
+                    const pct = Math.round((d.completed / d.total) * 100);
+                    return `<div class="stat-card" onclick="window.filterByField('${field}', '${k}')"><div class="flex justify-between font-bold text-sm mb-2"><span>${k}</span><span>${pct}%</span></div><div class="text-xs opacity-60 flex justify-between mb-2"><span>${d.completed}/${d.total} Done</span><span>${d.pending} Left</span></div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div></div>`;
+                }).join('');
+                return `<details class="expand-group" open><summary class="expand-summary"><span>${grpKey}</span><span class="text-xs bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded">${totalTickets} Items</span></summary><div class="expand-grid">${cards}</div></details>`;
+            }).join('');
+            const controls = `<div class="p-2 flex gap-2 border-b border-theme bg-panel"><button onclick="document.querySelectorAll('details').forEach(d=>d.open=true)" class="text-xs px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded hover:bg-primary hover:text-white transition">Expand All</button><button onclick="document.querySelectorAll('details').forEach(d=>d.open=false)" class="text-xs px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded hover:bg-primary hover:text-white transition">Collapse All</button></div>`;
+            document.getElementById('main-view-area').innerHTML = `<div class="flex flex-col h-full">${controls}<div class="group-container">${html}</div></div>`;
+        }
+        function filterByField(field, val) { 
+            if(field === 'route') document.getElementById('filter-route').value = val;
+            if(field === 'owner') document.getElementById('filter-owner').innerHTML += `<option value="${val}" selected>${val}</option>`;
+            triggerRender(); changeView('list'); 
+        }
+
+        // --- MAP RENDERER (Leaflet) ---
+        function renderLeafletMap(points) {
+            document.getElementById('main-view-area').innerHTML = '<div id="map-container"></div>';
+            
+            // Wait for DOM
+            setTimeout(() => {
+                mapInstance = L.map('map-container').setView([39.8, -98.6], 4);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                }).addTo(mapInstance);
+
+                points.forEach(p => {
+                    const color = p.urgent > 0 ? '#ef4444' : '#3b82f6';
+                    const radius = Math.min(10 + p.count, 40);
+                    
+                    const circle = L.circleMarker([p.lat, p.lon], {
+                        radius: radius / 2, // scale down
+                        fillColor: color,
+                        color: color,
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.6
+                    }).addTo(mapInstance);
+                    
+                    if (p.urgent > 0) circle._path.classList.add('marker-urgent'); // CSS class for pulse
+
+                    circle.bindPopup(`<b>${p.sample.zip3}XX Region</b><br>Total: ${p.count}<br>Urgent: ${p.urgent}<br><button onclick="window.loadTicket('${p.sample.id}')" class="text-blue-500 underline mt-1">View Sample #${p.sample.id}</button>`);
+                });
+            }, 100);
+        }
+
+        // --- LOGIC ---
+        function loadTicket(id) { currentTicketId = id; worker.postMessage({ type: 'GET_DETAIL', payload: { id } }); }
+        function openTicketOverlay(t, idx) {
+            if(!t) return;
+            document.getElementById('focus-overlay').classList.add('active');
+            const set = (i,v) => document.getElementById(i).innerText = v || '--';
+            set('f-id', '#'+t.id); set('f-customer', t.cust); set('f-acct', t.acct); set('f-so', t.so); set('f-route', t.route); set('f-whs', t.whs);
+            set('f-desc', t.issue + (t.desc ? "\n\n" + t.desc : "")); set('f-date', t.date); set('f-driver', t.driverRaw); set('f-contact', t.contact || ""); set('f-log-notes', t.lNotes);
+            set('f-type', t.recordType);
+            document.getElementById('f-owner').value = t.owner || ""; document.getElementById('f-notes').value = t.notes || "";
+            document.getElementById('f-badge').innerText = t.status;
+        }
+        function triggerRender() {
+            const filters = { search: document.getElementById('search-input').value.toLowerCase(), route: document.getElementById('filter-route').value, owner: document.getElementById('filter-owner').value, status: currentStatus, dateRange: dateFilter.selectedDates, mode: currentMode, userEmail: currentUserEmail, recordType: document.getElementById('filter-type').value };
+            worker.postMessage({ type: 'FILTER', payload: { filters } });
+        }
+        function setTheme(t) {
+            document.body.className = `theme-${t} ` + (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : '');
+            localStorage.setItem('logi_theme', t);
+        }
+        async function login() { try { const r = await msalInstance.loginPopup({ scopes: ["User.Read"] }); init(r.account.name, r.account.username); } catch (e) { document.getElementById('file-upload-fallback').classList.remove('hidden'); } }
+        function bypassAuth() { init("Offline Manager", "manager@wbmason.com"); }
+        function init(name, email) { currentUserEmail = email; document.getElementById('user-name').innerText = name; document.getElementById('login-container').classList.add('hidden'); document.getElementById('progress-container').classList.remove('hidden'); fetchLiveData(); }
+        async function fetchLiveData() { try { const r = await fetch(FLOW_URL, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: "Refresh", userEmail: currentUserEmail }) }); if(r.ok) { let j = JSON.parse(await r.text()); worker.postMessage({ type: 'PARSE', payload: { data: j.value || j.data } }); } else throw new Error(); } catch(e) { document.getElementById('file-upload-fallback').classList.remove('hidden'); } }
+        function handleFile(input) { const r = new FileReader(); r.onload = (e) => { const wb = XLSX.read(e.target.result, {type:'binary'}); worker.postMessage({ type: 'PARSE', payload: { data: XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:""}) } }); }; r.readAsBinaryString(input.files[0]); }
+        function saveLocal() { if(!currentTicketId) return; const notes = document.getElementById('f-notes').value; const owner = document.getElementById('f-owner').value; worker.postMessage({ type: 'UPDATE_TICKET', payload: { id: currentTicketId, updates: { notes, owner } } }); persistToVault({ id: currentTicketId, notes, owner, status: document.getElementById('f-badge').innerText }); Toastify({ text: "💾 Saved", duration: 1000 }).showToast(); }
+        function saveAndNext() { saveLocal(); navTicket(1); }
+        async function persistToVault(t) { await dbVault.tickets.put({ id: t.id, notes: t.notes, status: t.status, owner: t.owner, modifiedAt: new Date() }); }
+        async function checkVault() { if(await dbVault.tickets.count() > 0) document.getElementById('restore-toast').classList.add('visible'); }
+        async function restoreSession() { (await dbVault.tickets.toArray()).forEach(e => worker.postMessage({ type: 'UPDATE_TICKET', payload: { id: e.id, updates: { notes: e.notes, status: e.status, owner: e.owner } } })); triggerRender(); document.getElementById('restore-toast').classList.remove('visible'); }
+        async function discardSession() { await dbVault.tickets.clear(); document.getElementById('restore-toast').classList.remove('visible'); }
+        function updateFiltersUI(owners, routes) { document.getElementById('filter-owner').innerHTML = `<option value="all">Show Everyone</option><option value="me">My Queue</option>` + owners.map(i => `<option value="${i}">${i}</option>`); document.getElementById('f-owner').innerHTML = `<option value="">Unassigned</option>` + owners.map(i => `<option value="${i}">${i}</option>`); document.getElementById('filter-route').innerHTML = `<option value="all">All Routes</option>` + routes.map(i => `<option value="${i}">${i}</option>`); }
+        function updateCountsUI(c) { document.getElementById('count-today').innerText = c.today; document.getElementById('count-urgent').innerText = c.urgent; document.getElementById('count-all').innerText = c.all; }
+        function debouncedSearch() { clearTimeout(searchTimeout); searchTimeout = setTimeout(triggerRender, 300); }
+        function setFilterMode(m) { currentMode = m; triggerRender(); }
+        function setStatusFilter(s) { currentStatus = s; triggerRender(); }
+        function renderSnippets() { document.getElementById('snippet-container').innerHTML = userSnippets.map((s,i) => `<button onclick="window.insertNote('${s}')" oncontextmenu="window.removeSnippet(${i}); return false;" class="text-[9px] bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded hover:bg-primary hover:text-white">${s}</button>`).join(''); }
+        function addSnippet() { const s = prompt("New note:"); if(s) { userSnippets.push(s); localStorage.setItem('logi_snippets', JSON.stringify(userSnippets)); renderSnippets(); } }
+        function removeSnippet(i) { userSnippets.splice(i,1); localStorage.setItem('logi_snippets', JSON.stringify(userSnippets)); renderSnippets(); }
+        function insertNote(t) { document.getElementById('f-notes').value += `\n[${new Date().toLocaleTimeString()}] ${t}`; }
+        function closeFocus() { document.getElementById('focus-overlay').classList.remove('active'); triggerRender(); }
+        function navTicket(dir) { worker.postMessage({ type: 'NAV_TICKET', payload: { currentId: currentTicketId, dir } }); }
+        function setFocusStatus(s) { worker.postMessage({ type: 'UPDATE_TICKET', payload: { id: currentTicketId, updates: { status: s } } }); document.getElementById('f-badge').innerText = s; if(s==='Completed') confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } }); saveLocal(); }
+        function copyText(id) { navigator.clipboard.writeText(document.getElementById(id).innerText); Toastify({ text: "Copied" }).showToast(); }
+        function dragOverHandler(ev) { ev.preventDefault(); document.getElementById('drop-zone').classList.add('active'); }
+        function dragLeaveHandler(ev) { ev.preventDefault(); document.getElementById('drop-zone').classList.remove('active'); }
+        function dropHandler(ev) { ev.preventDefault(); document.getElementById('drop-zone').classList.remove('active'); if (ev.dataTransfer.items) handleFile({files: [ev.dataTransfer.items[0].getAsFile()]}); }
+        function exportData() { alert("Export feature requires backend update."); }
+        function resetApp() { localStorage.clear(); dbVault.delete().then(()=>location.reload()); }
+        function toggleAnalytics() { document.getElementById('analytics-overlay').classList.toggle('hidden'); }
+    </script>
+</body>
+</html>
