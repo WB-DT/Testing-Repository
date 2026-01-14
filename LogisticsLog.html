@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logistics Command v44.0</title>
+    <title>Logistics Command v45.0</title>
     
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -20,19 +20,20 @@
 
         .theme-dark {
             --bg-body: #0f172a; --bg-side: #1e293b; --bg-card: #1e293b;
-            --text-main: #f1f5f9; --text-muted: #94a3b8; --border: #334155;
+            --text-main: #f8fafc; /* Lighter for readability */
+            --text-muted: #cbd5e1; /* Much lighter than before */
+            --border: #334155;
             --brand: #38bdf8; --accent: #0f172a;
         }
 
         body { background-color: var(--bg-body); color: var(--text-main); font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; transition: all 0.2s ease; font-size: 12px; }
         
-        /* Layout */
         .app-grid { display: grid; grid-template-columns: 200px 1fr 0px; height: calc(100vh - 56px); transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .app-grid.show-detail { grid-template-columns: 200px 1fr 400px; }
 
         header, aside, main { background-color: var(--bg-side); border-color: var(--border); }
         
-        /* Compact Typography */
+        /* Compact UI elements */
         .text-tiny { font-size: 9px; }
         .text-compact { font-size: 10px; }
         
@@ -45,8 +46,10 @@
 
         input, select, textarea { background-color: var(--bg-card) !important; color: var(--text-main) !important; border: 1px solid var(--border) !important; outline: none; font-size: 11px; }
 
-        .nav-btn { font-size: 11px; transition: all 0.2s; }
+        /* Sidebar & Dark Mode Overrides */
+        .nav-btn { font-size: 11px; transition: all 0.2s; color: var(--text-muted); }
         .nav-btn.active { background-color: var(--accent); color: var(--brand); border-right: 3px solid var(--brand); opacity: 1 !important; }
+        .nav-btn:hover { color: var(--text-main); }
 
         #theme-dropdown { display: none; position: absolute; right: 0; top: 100%; width: 140px; background: var(--bg-side); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 50; }
         #theme-dropdown.show { display: block; }
@@ -56,7 +59,7 @@
 
     <header class="h-14 border-b flex items-center justify-between px-6 z-10">
         <div class="flex items-center gap-6">
-            <div class="text-lg font-black tracking-tighter italic" style="color: var(--brand)">LOGICOMMAND <span class="text-tiny opacity-50 not-italic ml-1">v44.0</span></div>
+            <div class="text-lg font-black tracking-tighter italic" style="color: var(--brand)">LOGICOMMAND <span class="text-tiny opacity-50 not-italic ml-1">v45.0</span></div>
             <div class="relative">
                 <i class="fa fa-search absolute left-3 top-2.5 text-gray-400 text-tiny"></i>
                 <input type="text" id="global-search" oninput="render()" placeholder="Search records..." class="rounded-full pl-8 pr-4 py-1.5 w-60 bg-gray-50 border-transparent">
@@ -119,7 +122,7 @@
                             <th>Date</th>
                             <th>Customer / SO</th>
                             <th>Warehouse</th>
-                            <th>Driver Phone</th>
+                            <th>Phone</th>
                             <th>Logistics Rep</th>
                             <th>Status</th>
                         </tr>
@@ -150,13 +153,10 @@
                     <div id="d-desc" class="text-xs opacity-80 leading-relaxed italic"></div>
                 </div>
 
-                <div class="space-y-2">
-                    <label class="text-tiny font-black uppercase opacity-40 px-1">Internal Work Logs</label>
-                    <textarea id="d-notes" oninput="saveLocal()" class="w-full p-4 rounded-xl h-40 text-xs shadow-inner" placeholder="Type updates here..."></textarea>
-                </div>
+                <textarea id="d-notes" oninput="saveLocal()" class="w-full p-4 rounded-xl h-40 text-xs shadow-inner" placeholder="Type internal logs..."></textarea>
 
                 <button onclick="setStatus('Completed')" class="w-full py-4 bg-green-600 text-white rounded-xl font-black text-tiny uppercase tracking-widest shadow-lg">
-                    Resolve & Close Ticket
+                    Resolve Ticket
                 </button>
             </div>
         </aside>
@@ -165,12 +165,11 @@
     <script>
         const FLOW_URL = 'https://49b71dde44f8e78e89bc0440816209.07.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/c8534a1735ca463d9386ac5ab1c89fcf/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=X3TCIX7rLqKbo5iiDAOozZ-JchO3BuPK5H8DW4aruAA';
         
-        let db = JSON.parse(localStorage.getItem('logistics_db_v44')) || [];
+        let db = JSON.parse(localStorage.getItem('logistics_db_v45')) || [];
         let currentMode = 'today';
         let currentTicketId = null;
 
         window.onload = () => {
-            pruneData();
             updateRepList();
             render();
             fetchLiveData();
@@ -187,15 +186,16 @@
                 });
                 const data = await response.json();
                 if (response.ok) ingest(data.value || []);
-            } catch (e) { console.error("Sync Error:", e); }
+            } catch (e) { console.error(e); }
             icon.classList.remove('fa-spin');
         }
 
         function ingest(data) {
             data.forEach(r => {
-                // Advanced Phone Extraction: Look for patterns like (123) 456-7890 or 1234567890
-                const rawDriver = val(r, ['drivername', 'driver', 'phone']);
-                const phoneMatch = rawDriver.match(/(\+?\d{1,2}\s?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/);
+                // Better mapping for Rep and Phone
+                const repVal = val(r, ['logisticsrep', 'rep', 'submittedby', 'name']);
+                const driverData = val(r, ['drivername', 'driver', 'phone']);
+                const phoneMatch = driverData.match(/\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/);
                 
                 const item = {
                     id: val(r, ['id', 'iteminternalid']),
@@ -203,8 +203,8 @@
                     order: val(r, ['salesorder']),
                     whse: val(r, ['warehouse']),
                     route: val(r, ['route']),
-                    rep: val(r, ['logisticsrep', 'assignedrep', 'rep', 'name']),
-                    driverPhone: phoneMatch ? phoneMatch[0] : 'No Number',
+                    rep: repVal || 'Unknown',
+                    driverPhone: phoneMatch ? phoneMatch[0] : 'None',
                     issue: val(r, ['issue']),
                     desc: val(r, ['description']),
                     date: (val(r, ['starttime']) || "").split('T')[0],
@@ -218,15 +218,9 @@
                     else db.push({...item, notes: ""});
                 }
             });
-            pruneData();
             updateRepList();
             saveLocal(true);
-            document.getElementById('sync-clock').innerText = `Updated: ${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
-        }
-
-        function pruneData() {
-            const twoWeeksAgo = Date.now() - (14 * 24 * 60 * 60 * 1000);
-            db = db.filter(t => t.status !== 'Completed' || t.timestamp > twoWeeksAgo);
+            document.getElementById('sync-clock').innerText = `Sync: ${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
         }
 
         function render() {
@@ -250,7 +244,7 @@
                 tr.className = currentTicketId === t.id ? 'active-row' : '';
                 tr.onclick = () => loadTicket(t.id);
                 tr.innerHTML = `
-                    <td class="font-mono text-tiny opacity-60">${t.date}</td>
+                    <td class="font-mono text-tiny opacity-50">${t.date}</td>
                     <td><div class="font-black">${t.company}</div><div class="text-tiny opacity-50">SO# ${t.order}</div></td>
                     <td class="font-bold">${t.whse}<br><span class="text-tiny opacity-50">Route ${t.route}</span></td>
                     <td class="font-mono text-blue-500 font-bold">${t.driverPhone}</td>
@@ -259,6 +253,15 @@
                 `;
                 list.appendChild(tr);
             });
+        }
+
+        function updateRepList() {
+            const sel = document.getElementById('filter-rep');
+            // Filter out Boolean strings like "Yes" / "No" to ensure only names appear
+            const reps = ["ALL", ...new Set(db.map(t => t.rep))]
+                .filter(r => r && r !== "Yes" && r !== "No") 
+                .sort();
+            sel.innerHTML = reps.map(r => `<option value="${r}">${r.toUpperCase()}</option>`).join('');
         }
 
         function loadTicket(id) {
@@ -276,7 +279,7 @@
             
             const cLink = document.getElementById('call-link');
             const tLink = document.getElementById('text-link');
-            if(t.driverPhone !== 'No Number') {
+            if(t.driverPhone !== 'None') {
                 cLink.href = `tel:${t.driverPhone}`;
                 tLink.href = `sms:${t.driverPhone}`;
                 cLink.style.opacity = "1"; tLink.style.opacity = "1";
@@ -287,6 +290,16 @@
             render();
         }
 
+        function val(row, terms) {
+            for (let t of terms) {
+                for (let k in row) {
+                    let cleanedKey = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    if (cleanedKey.includes(t)) return String(row[k] || '').trim();
+                }
+            }
+            return '';
+        }
+
         function setStatus(s) {
             const t = db.find(x => x.id === currentTicketId);
             if(t) { t.status = s; saveLocal(true); closeDetail(); }
@@ -295,23 +308,8 @@
         function saveLocal(reRender = false) {
             const t = db.find(x => x.id === currentTicketId);
             if(t) t.notes = document.getElementById('d-notes').value;
-            localStorage.setItem('logistics_db_v44', JSON.stringify(db));
+            localStorage.setItem('logistics_db_v45', JSON.stringify(db));
             if (reRender) render();
-        }
-
-        function val(row, terms) {
-            for (let t of terms) {
-                for (let k in row) {
-                    if (k.toLowerCase().replace(/[^a-z0-9]/g, '').includes(t.toLowerCase())) return String(row[k] || '').trim();
-                }
-            }
-            return '';
-        }
-
-        function updateRepList() {
-            const sel = document.getElementById('filter-rep');
-            const reps = ["ALL", ...new Set(db.map(t => t.rep))].filter(Boolean).sort();
-            sel.innerHTML = reps.map(r => `<option value="${r}">${r.toUpperCase()}</option>`).join('');
         }
 
         function setMode(m) {
